@@ -2,7 +2,8 @@
 import { useSelector } from 'react-redux'
 import Sidebar from '../components/Sidebar'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../api/axiosInstance'
+import { downloadReceipt } from '../api/transactionApi'
 
 type Tab = 'deposit' | 'withdraw' | 'transfer' | 'history'
 
@@ -13,6 +14,7 @@ export default function TransactionPage() {
   const [fromAcc, setFrom] = useState('')
   const [toAcc, setTo] = useState('')
   const [loading, setLoading] = useState(false)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<any[]>([])
   const [history, setHistory] = useState<any[]>([])
   const [selectedAcc, setSelectedAcc] = useState('')
@@ -21,7 +23,7 @@ export default function TransactionPage() {
 
   useEffect(() => {
     if (!user?.id) return
-    axios.get(`http://localhost:8080/api/account/user/${user.id}`, headers).then(res => {
+    api.get(`/account/user/${user.id}`, headers).then(res => {
       const accs = res.data.data || []
       setAccounts(accs)
       if (accs.length > 0) { setSelectedAcc(accs[0].accountNumber); setFrom(accs[0].accountNumber) }
@@ -32,7 +34,7 @@ export default function TransactionPage() {
     if (!accNum) return
     setHistLoading(true)
     try {
-      const res = await axios.get(`http://localhost:8080/api/transaction/history/${accNum}`, headers)
+      const res = await api.get(`/transaction/history/${accNum}`, headers)
       setHistory(res.data.data || [])
     } catch { toast.error('Failed to load history') }
     setHistLoading(false)
@@ -41,7 +43,7 @@ export default function TransactionPage() {
   useEffect(() => { if (tab === 'history' && selectedAcc) fetchHistory(selectedAcc) }, [tab, selectedAcc])
 
   const refreshAccounts = async () => {
-    const res = await axios.get(`http://localhost:8080/api/account/user/${user.id}`, headers)
+    const res = await api.get(`/account/user/${user.id}`, headers)
     setAccounts(res.data.data || [])
   }
 
@@ -49,7 +51,7 @@ export default function TransactionPage() {
     if (!amount || !selectedAcc) { toast.error('Select account and enter amount'); return }
     setLoading(true)
     try {
-      await axios.post(`http://localhost:8080/api/transaction/deposit?accountNumber=${selectedAcc}&amount=${amount}`, {}, headers)
+      await api.post(`/transaction/deposit?accountNumber=${selectedAcc}&amount=${amount}`, {}, headers)
       toast.success(`₹${amount} deposited!`); setAmount(''); refreshAccounts()
     } catch (err: any) { toast.error(err.response?.data?.message || 'Deposit failed') }
     setLoading(false)
@@ -59,7 +61,7 @@ export default function TransactionPage() {
     if (!amount || !selectedAcc) { toast.error('Select account and enter amount'); return }
     setLoading(true)
     try {
-      await axios.post(`http://localhost:8080/api/transaction/withdraw?accountNumber=${selectedAcc}&amount=${amount}`, {}, headers)
+      await api.post(`/transaction/withdraw?accountNumber=${selectedAcc}&amount=${amount}`, {}, headers)
       toast.success(`₹${amount} withdrawn!`); setAmount(''); refreshAccounts()
     } catch (err: any) { toast.error(err.response?.data?.message || 'Insufficient balance') }
     setLoading(false)
@@ -70,10 +72,46 @@ export default function TransactionPage() {
     if (fromAcc === toAcc) { toast.error('Same account'); return }
     setLoading(true)
     try {
-      await axios.post('http://localhost:8080/api/transaction/transfer', { fromAccount: fromAcc, toAccount: toAcc, amount: parseFloat(amount), description: 'Transfer' }, headers)
+      await api.post('/transaction/transfer', { fromAccount: fromAcc, toAccount: toAcc, amount: parseFloat(amount), description: 'Transfer' }, headers)
       toast.success(`₹${amount} transferred!`); setAmount(''); setTo(''); refreshAccounts()
     } catch (err: any) { toast.error(err.response?.data?.message || 'Transfer failed') }
     setLoading(false)
+  }
+
+  const handleDownloadReceipt = async (transactionId: string) => {
+    setDownloadingId(transactionId)
+    try {
+      const response = await downloadReceipt(transactionId)
+      const url = window.URL.createObjectURL(response.data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `nexbank-receipt-${transactionId}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      toast.success('Receipt downloaded!')
+    } catch {
+      toast.error('Failed to download receipt')
+    }
+    setDownloadingId(null)
+  }
+
+  const handlePrintReceipt = async (transactionId: string) => {
+    setDownloadingId(transactionId)
+    try {
+      const response = await downloadReceipt(transactionId)
+      const url = window.URL.createObjectURL(response.data)
+      const printWindow = window.open(url)
+      if (printWindow) {
+        printWindow.addEventListener('load', () => {
+          printWindow.print()
+        })
+      }
+    } catch {
+      toast.error('Failed to print receipt')
+    }
+    setDownloadingId(null)
   }
 
   const tabs = [
@@ -168,15 +206,23 @@ export default function TransactionPage() {
                   const isCredit = tx.type === 'CREDIT'
                   const color = isCredit ? '#00FFB2' : tx.type === 'DEBIT' ? '#FF4D6D' : '#3B9EFF'
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: '12px', marginBottom: '4px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: '12px', marginBottom: '4px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
                         <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: `${color}12`, border: `1px solid ${color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', color }}>{isCredit ? '↓' : tx.type === 'DEBIT' ? '↑' : '⇄'}</div>
                         <div>
                           <div style={{ fontSize: '14px', fontWeight: '600' }}>{tx.description || tx.type}</div>
                           <div style={{ fontSize: '11px', color: '#3A5070', marginTop: '3px' }}>{tx.date ? new Date(tx.date).toLocaleString('en-IN') : ''}</div>
                         </div>
                       </div>
-                      <div style={{ fontSize: '15px', fontWeight: '700', color }}>{isCredit ? '+' : '-'}₹{(tx.amount||0).toLocaleString('en-IN')}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ fontSize: '15px', fontWeight: '700', color, minWidth: '120px', textAlign: 'right' }}>{isCredit ? '+' : '-'}₹{(tx.amount||0).toLocaleString('en-IN')}</div>
+                        <button onClick={() => handleDownloadReceipt(tx.id)} disabled={downloadingId === tx.id} style={{ background: 'rgba(245,200,66,0.15)', border: '1px solid rgba(245,200,66,0.3)', color: '#F5C842', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: '600', cursor: downloadingId === tx.id ? 'not-allowed' : 'pointer', opacity: downloadingId === tx.id ? 0.7 : 1, letterSpacing: '1px' }}>
+                          {downloadingId === tx.id ? '⏳' : '📥'} PDF
+                        </button>
+                        <button onClick={() => handlePrintReceipt(tx.id)} disabled={downloadingId === tx.id} style={{ background: 'rgba(59,158,255,0.15)', border: '1px solid rgba(59,158,255,0.3)', color: '#3B9EFF', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: '600', cursor: downloadingId === tx.id ? 'not-allowed' : 'pointer', opacity: downloadingId === tx.id ? 0.7 : 1, letterSpacing: '1px' }}>
+                          {downloadingId === tx.id ? '⏳' : '🖨️'} PRINT
+                        </button>
+                      </div>
                     </div>
                   )
                 })}

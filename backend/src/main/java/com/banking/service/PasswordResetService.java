@@ -77,6 +77,17 @@ public class PasswordResetService {
         mailSender.send(message);
     }
 
+    public ApiResponse<String> verifyOtp(String email, String otp) {
+        String storedOtp = otpStore.get(email);
+        if (storedOtp == null) {
+            return new ApiResponse<>(false, "OTP expired or not sent", null);
+        }
+        if (!storedOtp.equals(otp)) {
+            return new ApiResponse<>(false, "Invalid OTP", null);
+        }
+        return new ApiResponse<>(true, "OTP verified", null);
+    }
+
     public ApiResponse<String> resetPassword(String email, String newPassword) {
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {

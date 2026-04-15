@@ -15,3 +15,8 @@ export const transfer = (data: {
 
 export const getHistory = (accountNumber: string) =>
   api.get(`/transaction/history/${accountNumber}`)
+
+export const downloadReceipt = (transactionId: string) =>
+  api.get(`/transaction/${transactionId}/receipt`, {
+    responseType: 'blob'
+  })

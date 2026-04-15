@@ -2,7 +2,7 @@
 import { useSelector } from 'react-redux'
 import Sidebar from '../components/Sidebar'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../api/axiosInstance'
 
 export default function AdminPage() {
   const { token } = useSelector((s: any) => s.auth)
@@ -12,7 +12,7 @@ export default function AdminPage() {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/api/user/all', headers)
+      const res = await api.get('http://localhost:8082/api/user/all', headers)
       setUsers(res.data.data || [])
     } catch { toast.error('Failed to load users') }
     setLoading(false)
@@ -22,7 +22,7 @@ export default function AdminPage() {
 
   const toggleBlock = async (id: string, status: string) => {
     try {
-      await axios.put(`http://localhost:8080/api/user/${status === 'ACTIVE' ? 'block' : 'unblock'}/${id}`, {}, headers)
+      await api.put(`/user/${status === 'ACTIVE' ? 'block' : 'unblock'}/${id}`, {}, headers)
       toast.success('Status updated!'); fetchUsers()
     } catch { toast.error('Failed') }
   }

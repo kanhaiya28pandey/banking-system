@@ -1,4 +1,4 @@
-﻿package com.banking.config;
+package com.banking.config;
 
 import com.banking.security.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Autowired;

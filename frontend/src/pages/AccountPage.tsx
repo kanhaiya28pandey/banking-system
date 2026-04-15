@@ -2,7 +2,7 @@
 import { useSelector } from 'react-redux'
 import Sidebar from '../components/Sidebar'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../api/axiosInstance'
 
 export default function AccountPage() {
   const { user, token } = useSelector((s: any) => s.auth)
@@ -16,7 +16,7 @@ export default function AccountPage() {
   const fetchAccounts = async () => {
     if (!user?.id) { setLoading(false); return }
     try {
-      const res = await axios.get(`http://localhost:8080/api/account/user/${user.id}`, headers)
+      const res = await api.get(`/account/user/${user.id}`, headers)
       setAccounts(res.data.data || [])
     } catch { toast.error('Failed to load accounts') }
     setLoading(false)
@@ -28,8 +28,8 @@ export default function AccountPage() {
     if (!user?.id) { toast.error('Please re-login'); return }
     setCreating(true)
     try {
-      const res = await axios.post(
-        `http://localhost:8080/api/account/create?userId=${user.id}&accountType=${accType}`,
+      const res = await api.post(
+        `/account/create?userId=${user.id}&accountType=${accType}`,
         {}, headers)
       if (res.data.success) {
         toast.success(`${accType} account created!`)

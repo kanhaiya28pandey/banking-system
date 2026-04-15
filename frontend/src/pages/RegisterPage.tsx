@@ -2,7 +2,7 @@
 import { useNavigate, Link, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../api/axiosInstance'
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' })
@@ -22,7 +22,7 @@ export default function RegisterPage() {
     }
     setLoading(true)
     try {
-      const res = await axios.post('http://localhost:8080/api/auth/register', form)
+      const res = await api.post('http://localhost:8082/api/auth/register', form)
       if (res.data.success) {
         toast.success('Account created! Please login.')
         navigate('/login')

@@ -3,7 +3,7 @@ import { useNavigate, Link, Navigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { setCredentials } from '../store/authSlice'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../api/axiosInstance'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -20,11 +20,11 @@ export default function LoginPage() {
     if (!email || !password) { toast.error('Fill all fields'); return }
     setLoading(true)
     try {
-      const res = await axios.post('http://localhost:8080/api/auth/login', { email, password })
+      const res = await api.post('/auth/login', { email, password })
       if (res.data.success) {
         const token = res.data.data
-        const userRes = await axios.get(
-          `http://localhost:8080/api/user/by-email?email=${email}`,
+        const userRes = await api.get(
+          `/user/by-email?email=${email}`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
         dispatch(setCredentials({ user: userRes.data.data, token }))

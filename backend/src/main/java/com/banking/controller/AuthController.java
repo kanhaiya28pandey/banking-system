@@ -34,6 +34,14 @@ public class AuthController {
             passwordResetService.generateOtp(email));
     }
 
+    @PostMapping("/verify-otp")
+    public ResponseEntity<ApiResponse<String>> verifyOtp(
+            @RequestParam String email,
+            @RequestParam String otp) {
+        return ResponseEntity.ok(
+            passwordResetService.verifyOtp(email, otp));
+    }
+
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<String>> resetPassword(
             @RequestParam String email,

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import { setCredentials } from '../store/authSlice'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../api/axiosInstance'
 
 export default function ProfilePage() {
   const { user, token } = useSelector((s: any) => s.auth)
@@ -25,7 +25,7 @@ export default function ProfilePage() {
     if (!form.name||!form.phone) { toast.error('Fill all fields'); return }
     setLoading(true)
     try {
-      const res = await axios.put(`http://localhost:8080/api/user/update/${user.id}`, { name: form.name, phone: form.phone }, headers)
+      const res = await api.put(`/user/update/${user.id}`, { name: form.name, phone: form.phone }, headers)
       if (res.data.success) { dispatch(setCredentials({ user: { ...user, ...res.data.data }, token })); toast.success('Profile updated!') }
       else toast.error(res.data.message)
     } catch { toast.error('Failed') }
@@ -38,7 +38,7 @@ export default function ProfilePage() {
     if (pwd.newPassword.length < 6) { toast.error('Min 6 characters'); return }
     setPwdLoading(true)
     try {
-      const res = await axios.post(`http://localhost:8080/api/auth/reset-password?email=${user.email}&newPassword=${pwd.newPassword}`, {}, headers)
+      const res = await api.post(`/auth/reset-password?email=${user.email}&newPassword=${pwd.newPassword}`, {}, headers)
       if (res.data.success) { toast.success('Password changed! Login again.'); setTimeout(() => navigate('/login'), 2000) }
       else toast.error(res.data.message)
     } catch { toast.error('Failed') }

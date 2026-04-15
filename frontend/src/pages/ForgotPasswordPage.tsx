@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../api/axiosInstance'
 
 type Step = 'email' | 'otp' | 'reset' | 'done'
 
@@ -9,7 +9,6 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
-  const [generatedOtp, setGeneratedOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,20 +25,28 @@ export default function ForgotPasswordPage() {
     if (!email) { toast.error('Enter email'); return }
     setLoading(true)
     try {
-      const res = await axios.post(`http://localhost:8080/api/auth/forgot-password?email=${email}`)
+      const res = await api.post(`/auth/forgot-password?email=${email}`)
       if (res.data.success) {
-        setGeneratedOtp(res.data.data)
-        toast.success('OTP sent!')
+        toast.success('OTP sent to your email!')
         setStep('otp')
       } else { toast.error(res.data.message) }
     } catch { toast.error('Email not found.') }
     setLoading(false)
   }
 
-  const handleVerifyOtp = () => {
-    if (otp !== generatedOtp) { toast.error('Invalid OTP'); return }
-    toast.success('OTP verified!')
-    setStep('reset')
+  const handleVerifyOtp = async () => {
+    if (!otp) { toast.error('Enter OTP'); return }
+    setLoading(true)
+    try {
+      const res = await api.post(`/auth/verify-otp?email=${email}&otp=${otp}`)
+      if (res.data.success) {
+        toast.success('OTP verified!')
+        setStep('reset')
+      } else {
+        toast.error(res.data.message || 'Invalid OTP')
+      }
+    } catch { toast.error('OTP verification failed.') }
+    setLoading(false)
   }
 
   const handleResetPassword = async () => {
@@ -48,7 +55,7 @@ export default function ForgotPasswordPage() {
     if (newPassword.length < 6) { toast.error('Min 6 characters'); return }
     setLoading(true)
     try {
-      const res = await axios.post(`http://localhost:8080/api/auth/reset-password?email=${email}&newPassword=${newPassword}`)
+      const res = await api.post(`/auth/reset-password?email=${email}&newPassword=${newPassword}`)
       if (res.data.success) {
         toast.success('Password reset!')
         setStep('done')
@@ -99,22 +106,19 @@ export default function ForgotPasswordPage() {
 
         {step === 'otp' && (
           <>
-            <div style={{ background: 'rgba(0,255,178,0.08)', border: '1px solid rgba(0,255,178,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '11px', color: '#7A8FA6', marginBottom: '6px' }}>DEV MODE — YOUR OTP</div>
-              <div style={{ fontSize: '32px', fontWeight: '800', color: '#00FFB2', letterSpacing: '8px', fontFamily: 'monospace' }}>{generatedOtp}</div>
-            </div>
+            <p style={{ fontSize: '14px', color: '#7A8FA6', marginBottom: '24px', lineHeight: '1.6' }}>Enter the 6-digit OTP sent to your email.</p>
             <div style={{ marginBottom: '24px' }}>
               <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>ENTER OTP</label>
               <input type="text" value={otp} onChange={e => setOtp(e.target.value)}
                 placeholder="000000" maxLength={6}
                 style={{ ...inputStyle, textAlign: 'center', fontSize: '24px', letterSpacing: '8px' }} />
             </div>
-            <button onClick={handleVerifyOtp} style={{
+            <button onClick={handleVerifyOtp} disabled={loading} style={{
               width: '100%', background: 'linear-gradient(135deg, #F5C842, #D4A017)', color: '#060A12',
               border: 'none', borderRadius: '12px', padding: '16px', fontSize: '13px', fontWeight: '700',
-              cursor: 'pointer', letterSpacing: '1.5px', marginBottom: '12px',
-              boxShadow: '0 6px 24px rgba(245,200,66,0.4)'
-            }}>VERIFY OTP →</button>
+              cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '1.5px', marginBottom: '12px',
+              boxShadow: '0 6px 24px rgba(245,200,66,0.4)', opacity: loading ? 0.7 : 1
+            }}>{loading ? 'VERIFYING...' : 'VERIFY OTP →'}</button>
             <button onClick={() => setStep('email')} style={{
               width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
               color: '#7A8FA6', borderRadius: '12px', padding: '12px', cursor: 'pointer', fontSize: '13px'

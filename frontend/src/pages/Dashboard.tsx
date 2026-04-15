@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
-import axios from 'axios'
+import api from '../api/axiosInstance'
 
 export default function Dashboard() {
   const { user, token } = useSelector((s: any) => s.auth)
@@ -13,7 +13,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user?.id) return
-    axios.get(`http://localhost:8080/api/account/user/${user.id}`, headers)
+    api.get(`/account/user/${user.id}`, headers)
       .then(res => setAccounts(res.data.data || []))
       .catch(() => {})
   }, [user])
@@ -21,7 +21,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (accounts.length === 0) return
     Promise.all(accounts.map((acc: any) =>
-      axios.get(`http://localhost:8080/api/transaction/history/${acc.accountNumber}`, headers)
+      api.get(`/transaction/history/${acc.accountNumber}`, headers)
         .then(r => r.data.data || [])
         .catch(() => [])
     )).then(results => {
