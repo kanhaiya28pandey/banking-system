@@ -29,6 +29,7 @@ public class ScheduledTransactionService {
     @Autowired private UserRepository userRepository;
     @Autowired private NotificationService notificationService;
     @Autowired private TransactionService transactionService;
+    @Autowired private WebSocketBalanceService websocketBalanceService;
 
     public ScheduledTransaction createScheduledTransfer(String userId, ScheduledTransferRequest req) {
         ScheduledTransaction st = new ScheduledTransaction();
@@ -127,6 +128,17 @@ public class ScheduledTransactionService {
             toAcc.setBalance(toAcc.getBalance() + st.getAmount());
             accountRepository.save(fromAcc);
             accountRepository.save(toAcc);
+
+            // Broadcast balance updates
+            websocketBalanceService.broadcastBalanceUpdate(st.getUserId(), st.getFromAccount());
+            try {
+                Optional<User> receiverOpt = userRepository.findById(toAcc.getUserId());
+                if (receiverOpt.isPresent()) {
+                    websocketBalanceService.broadcastBalanceUpdate(toAcc.getUserId(), st.getToAccount());
+                }
+            } catch (Exception e) {
+                System.err.println("Broadcast error: " + e.getMessage());
+            }
 
             // Create transaction record
             Transaction tx = new Transaction();

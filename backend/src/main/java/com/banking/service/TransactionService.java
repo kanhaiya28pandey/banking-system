@@ -25,6 +25,7 @@ public class TransactionService {
     @Autowired private TransactionRepository transactionRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private NotificationService notificationService;
+    @Autowired private WebSocketBalanceService websocketBalanceService;
 
     @Transactional
     public Transaction deposit(String accountNumber, Double amount) {
@@ -49,6 +50,8 @@ public class TransactionService {
             Optional<User> user = userRepository.findById(account.getUserId());
             if (user.isPresent()) {
                 notificationService.sendTransactionNotification(saved, account, user.get());
+                // Broadcast balance update via WebSocket
+                websocketBalanceService.broadcastBalanceUpdate(account.getUserId(), accountNumber);
             }
         } catch (Exception e) {
             System.err.println("Notification error: " + e.getMessage());
@@ -82,6 +85,8 @@ public class TransactionService {
             Optional<User> user = userRepository.findById(account.getUserId());
             if (user.isPresent()) {
                 notificationService.sendTransactionNotification(saved, account, user.get());
+                // Broadcast balance update via WebSocket
+                websocketBalanceService.broadcastBalanceUpdate(account.getUserId(), accountNumber);
             }
         } catch (Exception e) {
             System.err.println("Notification error: " + e.getMessage());
@@ -124,11 +129,15 @@ public class TransactionService {
             Optional<User> senderUser = userRepository.findById(from.getUserId());
             if (senderUser.isPresent()) {
                 notificationService.sendTransactionNotification(saved, from, senderUser.get());
+                // Broadcast balance update via WebSocket
+                websocketBalanceService.broadcastBalanceUpdate(from.getUserId(), req.getFromAccount());
             }
 
             Optional<User> receiverUser = userRepository.findById(to.getUserId());
             if (receiverUser.isPresent()) {
                 notificationService.sendTransactionNotification(saved, to, receiverUser.get());
+                // Broadcast balance update via WebSocket
+                websocketBalanceService.broadcastBalanceUpdate(to.getUserId(), req.getToAccount());
             }
         } catch (Exception e) {
             System.err.println("Notification error: " + e.getMessage());
