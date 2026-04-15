@@ -6,12 +6,12 @@ import api from '../api/axiosInstance'
 import { createScheduledTransfer, getScheduledTransfers, pauseScheduledTransfer, resumeScheduledTransfer, cancelScheduledTransfer } from '../api/scheduledTransferApi'
 
 export default function ScheduledTransfersPage() {
-  const { user } = useSelector((s: any) => s.auth)
+  const { user, token } = useSelector((s: any) => s.auth)
   const [transfers, setTransfers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [accounts, setAccounts] = useState<any[]>([])
-  const [headers, setHeaders] = useState<any>({})
+  const headers = { headers: { Authorization: `Bearer ${token}` } }
 
   const [formData, setFormData] = useState({
     fromAccount: '',
@@ -25,17 +25,10 @@ export default function ScheduledTransfersPage() {
   })
 
   useEffect(() => {
-    const { token } = useSelector((s: any) => s.auth)
-    if (token) {
-      setHeaders({ headers: { Authorization: `Bearer ${token}` } })
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!user?.id || !headers.headers) return
+    if (!user?.id || !token) return
     fetchAccounts()
     fetchTransfers()
-  }, [user, headers])
+  }, [user, token])
 
   const fetchAccounts = async () => {
     try {
