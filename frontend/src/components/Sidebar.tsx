@@ -6,6 +6,7 @@ const navItems = [
   { label: 'Dashboard', path: '/', icon: '⬡' },
   { label: 'Accounts', path: '/accounts', icon: '◈' },
   { label: 'Transactions', path: '/transactions', icon: '⇄' },
+  { label: 'Scheduled Transfers', path: '/scheduled-transfers', icon: '⏲️' },
   { label: 'ATM Console', path: '/atm', icon: '◉' },
   { label: 'Profile', path: '/profile', icon: '👤' },
   { label: 'Notifications', path: '/settings/notifications', icon: '🔔' },
