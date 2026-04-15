@@ -17,4 +17,6 @@ public class User {
     private String role;
     private String status;
     private String phone;
+    private Boolean notificationsEnabled;
+    private String preferredNotificationMethod;
 }

@@ -1,21 +1,30 @@
 package com.banking.service;
 
 import com.banking.dto.TransactionRequest;
+import com.banking.dto.TransactionFilterRequest;
 import com.banking.model.Account;
 import com.banking.model.Transaction;
+import com.banking.model.User;
 import com.banking.repository.AccountRepository;
 import com.banking.repository.TransactionRepository;
+import com.banking.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class TransactionService {
 
     @Autowired private AccountRepository accountRepository;
     @Autowired private TransactionRepository transactionRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private NotificationService notificationService;
 
     @Transactional
     public Transaction deposit(String accountNumber, Double amount) {
@@ -33,7 +42,19 @@ public class TransactionService {
         tx.setDate(LocalDateTime.now());
         tx.setStatus("SUCCESS");
         tx.setDescription("Deposit");
-        return transactionRepository.save(tx);
+        Transaction saved = transactionRepository.save(tx);
+
+        // Send notification
+        try {
+            Optional<User> user = userRepository.findById(account.getUserId());
+            if (user.isPresent()) {
+                notificationService.sendTransactionNotification(saved, account, user.get());
+            }
+        } catch (Exception e) {
+            System.err.println("Notification error: " + e.getMessage());
+        }
+
+        return saved;
     }
 
     @Transactional
@@ -54,7 +75,19 @@ public class TransactionService {
         tx.setDate(LocalDateTime.now());
         tx.setStatus("SUCCESS");
         tx.setDescription("Withdrawal");
-        return transactionRepository.save(tx);
+        Transaction saved = transactionRepository.save(tx);
+
+        // Send notification
+        try {
+            Optional<User> user = userRepository.findById(account.getUserId());
+            if (user.isPresent()) {
+                notificationService.sendTransactionNotification(saved, account, user.get());
+            }
+        } catch (Exception e) {
+            System.err.println("Notification error: " + e.getMessage());
+        }
+
+        return saved;
     }
 
     @Transactional
@@ -84,12 +117,48 @@ public class TransactionService {
         tx.setStatus("SUCCESS");
         tx.setDescription(req.getDescription() != null
             ? req.getDescription() : "Transfer");
-        return transactionRepository.save(tx);
+        Transaction saved = transactionRepository.save(tx);
+
+        // Send notifications to both sender and receiver
+        try {
+            Optional<User> senderUser = userRepository.findById(from.getUserId());
+            if (senderUser.isPresent()) {
+                notificationService.sendTransactionNotification(saved, from, senderUser.get());
+            }
+
+            Optional<User> receiverUser = userRepository.findById(to.getUserId());
+            if (receiverUser.isPresent()) {
+                notificationService.sendTransactionNotification(saved, to, receiverUser.get());
+            }
+        } catch (Exception e) {
+            System.err.println("Notification error: " + e.getMessage());
+        }
+
+        return saved;
     }
 
     public List<Transaction> getHistory(String accountNumber) {
         return transactionRepository
             .findByFromAccountOrToAccountOrderByDateDesc(
                 accountNumber, accountNumber);
+    }
+
+    public Page<Transaction> searchTransactions(TransactionFilterRequest filter) {
+        if (filter.getPage() == null) filter.setPage(0);
+        if (filter.getPageSize() == null) filter.setPageSize(20);
+
+        Pageable pageable = PageRequest.of(filter.getPage(), filter.getPageSize());
+
+        // Use the MongoDB query method
+        return transactionRepository.searchTransactions(
+            filter.getAccountNumber(),
+            filter.getFromDate(),
+            filter.getToDate(),
+            filter.getMinAmount(),
+            filter.getMaxAmount(),
+            filter.getTransactionType(),
+            filter.getStatus(),
+            pageable
+        );
     }
 }

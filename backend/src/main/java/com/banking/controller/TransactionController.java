@@ -3,19 +3,24 @@ package com.banking.controller;
 import com.banking.dto.ApiResponse;
 import com.banking.dto.TransactionRequest;
 import com.banking.dto.TransactionResponse;
+import com.banking.dto.TransactionFilterRequest;
 import com.banking.model.Transaction;
 import com.banking.model.Account;
 import com.banking.model.User;
 import com.banking.service.TransactionService;
 import com.banking.service.ReceiptService;
+import com.banking.service.ExportService;
 import com.banking.repository.TransactionRepository;
 import com.banking.repository.AccountRepository;
 import com.banking.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +31,7 @@ public class TransactionController {
 
     @Autowired private TransactionService transactionService;
     @Autowired private ReceiptService receiptService;
+    @Autowired private ExportService exportService;
     @Autowired private TransactionRepository transactionRepository;
     @Autowired private AccountRepository accountRepository;
     @Autowired private UserRepository userRepository;
@@ -82,6 +88,19 @@ public class TransactionController {
             true, "History fetched", txs));
     }
 
+    @PostMapping("/search")
+    public ResponseEntity<ApiResponse<Page<Transaction>>> search(
+            @RequestBody TransactionFilterRequest filter) {
+        try {
+            Page<Transaction> results = transactionService.searchTransactions(filter);
+            return ResponseEntity.ok(new ApiResponse<>(
+                true, "Search completed", results));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ApiResponse<>(
+                false, "Search failed: " + e.getMessage(), null));
+        }
+    }
+
     @GetMapping("/{transactionId}/receipt")
     public ResponseEntity<byte[]> downloadReceipt(@PathVariable String transactionId) {
         try {
@@ -114,6 +133,56 @@ public class TransactionController {
             return ResponseEntity.ok()
                     .headers(headers)
                     .body(pdfBytes);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    @GetMapping("/export/pdf")
+    public ResponseEntity<byte[]> exportStatementPdf(
+            @RequestParam String accountNumber,
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate) {
+        try {
+            LocalDateTime from = fromDate != null ? LocalDateTime.parse(fromDate) : null;
+            LocalDateTime to = toDate != null ? LocalDateTime.parse(toDate) : null;
+
+            byte[] pdfBytes = exportService.generateStatementPdf(accountNumber, from, to);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "nexbank-statement-" + accountNumber + ".pdf");
+            headers.setContentLength(pdfBytes.length);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    @GetMapping("/export/csv")
+    public ResponseEntity<byte[]> exportStatementCsv(
+            @RequestParam String accountNumber,
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate) {
+        try {
+            LocalDateTime from = fromDate != null ? LocalDateTime.parse(fromDate) : null;
+            LocalDateTime to = toDate != null ? LocalDateTime.parse(toDate) : null;
+
+            byte[] csvBytes = exportService.generateStatementCsv(accountNumber, from, to);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("text/csv"));
+            headers.setContentDispositionFormData("attachment", "nexbank-statement-" + accountNumber + ".csv");
+            headers.setContentLength(csvBytes.length);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(csvBytes);
 
         } catch (Exception e) {
             return ResponseEntity.status(500).build();

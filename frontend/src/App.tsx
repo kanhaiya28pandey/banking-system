@@ -11,6 +11,7 @@ import AtmPage from './pages/AtmPage'
 import AdminPage from './pages/AdminPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ProfilePage from './pages/ProfilePage'
+import NotificationSettingsPage from './pages/NotificationSettingsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
           <Route path="/atm"         element={<ProtectedRoute><AtmPage /></ProtectedRoute>} />
           <Route path="/admin"       element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
           <Route path="/profile"     element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/settings/notifications" element={<ProtectedRoute><NotificationSettingsPage /></ProtectedRoute>} />
           <Route path="*"            element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>

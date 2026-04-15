@@ -8,6 +8,7 @@ const navItems = [
   { label: 'Transactions', path: '/transactions', icon: '⇄' },
   { label: 'ATM Console', path: '/atm', icon: '◉' },
   { label: 'Profile', path: '/profile', icon: '👤' },
+  { label: 'Notifications', path: '/settings/notifications', icon: '🔔' },
   { label: 'Admin Panel', path: '/admin', icon: '⬟' },
 ]
 

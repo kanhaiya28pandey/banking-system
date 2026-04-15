@@ -1,9 +1,11 @@
 ﻿import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import Sidebar from '../components/Sidebar'
+import TransactionFilters from '../components/TransactionFilters'
+import ExportButtons from '../components/ExportButtons'
 import toast from 'react-hot-toast'
 import api from '../api/axiosInstance'
-import { downloadReceipt } from '../api/transactionApi'
+import { downloadReceipt, searchTransactions } from '../api/transactionApi'
 
 type Tab = 'deposit' | 'withdraw' | 'transfer' | 'history'
 
@@ -19,6 +21,9 @@ export default function TransactionPage() {
   const [history, setHistory] = useState<any[]>([])
   const [selectedAcc, setSelectedAcc] = useState('')
   const [histLoading, setHistLoading] = useState(false)
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearchMode, setIsSearchMode] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
   const headers = { headers: { Authorization: `Bearer ${token}` } }
 
   useEffect(() => {
@@ -45,6 +50,29 @@ export default function TransactionPage() {
   const refreshAccounts = async () => {
     const res = await api.get(`/account/user/${user.id}`, headers)
     setAccounts(res.data.data || [])
+  }
+
+  const handleApplyFilters = async (filters: any) => {
+    setSearchLoading(true)
+    try {
+      const response = await searchTransactions({
+        accountNumber: filters.accountNumber || undefined,
+        fromDate: filters.fromDate || undefined,
+        toDate: filters.toDate || undefined,
+        minAmount: filters.minAmount || undefined,
+        maxAmount: filters.maxAmount || undefined,
+        transactionType: filters.transactionType || undefined,
+        status: filters.status || undefined,
+        page: 0,
+        pageSize: 20,
+      })
+      setSearchResults(response.data.data?.content || [])
+      setIsSearchMode(true)
+      toast.success(`Found ${response.data.data?.content?.length || 0} transactions`)
+    } catch (err: any) {
+      toast.error('Search failed')
+    }
+    setSearchLoading(false)
   }
 
   const handleDeposit = async () => {
@@ -196,13 +224,33 @@ export default function TransactionPage() {
               <div style={{ background: 'rgba(10,18,32,0.85)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '20px', padding: '28px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div style={{ fontSize: '13px', fontWeight: '700', color: '#F5C842', letterSpacing: '2px' }}>TRANSACTION HISTORY</div>
-                  <select value={selectedAcc} onChange={e => { setSelectedAcc(e.target.value); fetchHistory(e.target.value) }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: '#F0EFEA', fontSize: '12px', outline: 'none' }}>
+                  <select value={selectedAcc} onChange={e => { setSelectedAcc(e.target.value); fetchHistory(e.target.value); setIsSearchMode(false) }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: '#F0EFEA', fontSize: '12px', outline: 'none' }}>
                     {accounts.map(acc => <option key={acc.id} value={acc.accountNumber}>{acc.accountType} — {acc.accountNumber}</option>)}
                   </select>
                 </div>
-                {histLoading && <div style={{ textAlign: 'center', padding: '40px', color: '#4A6080' }}>LOADING...</div>}
-                {!histLoading && history.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: '#4A6080' }}><div style={{ fontSize: '36px', marginBottom: '12px' }}>📋</div>NO TRANSACTIONS YET</div>}
-                {!histLoading && history.map((tx: any, i: number) => {
+
+                <TransactionFilters
+                  accounts={accounts}
+                  onApply={handleApplyFilters}
+                  isLoading={searchLoading}
+                />
+
+                <ExportButtons
+                  accountNumber={selectedAcc}
+                  fromDate={new Date().toISOString()}
+                  toDate={new Date().toISOString()}
+                />
+
+                {isSearchMode && (
+                  <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(0,255,178,0.08)', border: '1px solid rgba(0,255,178,0.2)', borderRadius: '10px', fontSize: '12px', color: '#00FFB2', letterSpacing: '1px' }}>
+                    ✓ SEARCH ACTIVE — Showing filtered results ({searchResults.length} transactions)
+                    <button onClick={() => { setIsSearchMode(false); fetchHistory(selectedAcc) }} style={{ marginLeft: '12px', background: 'none', border: 'none', color: '#3B9EFF', cursor: 'pointer', textDecoration: 'underline', fontSize: '12px' }}>Back to all</button>
+                  </div>
+                )}
+
+                {(searchLoading || histLoading) && <div style={{ textAlign: 'center', padding: '40px', color: '#4A6080' }}>LOADING...</div>}
+                {!searchLoading && !histLoading && (isSearchMode ? searchResults.length === 0 : history.length === 0) && <div style={{ textAlign: 'center', padding: '40px', color: '#4A6080' }}><div style={{ fontSize: '36px', marginBottom: '12px' }}>📋</div>NO TRANSACTIONS YET</div>}
+                {!searchLoading && !histLoading && (isSearchMode ? searchResults : history).map((tx: any, i: number) => {
                   const isCredit = tx.type === 'CREDIT'
                   const color = isCredit ? '#00FFB2' : tx.type === 'DEBIT' ? '#FF4D6D' : '#3B9EFF'
                   return (
