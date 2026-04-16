@@ -63,7 +63,7 @@ export default function AtmPage() {
 
   const addLog = (msg: string) => setLog(p => [...p, msg])
   const atmKey = (v: string) => setInput(p => p + v)
-  const atmClear = () => { setInput(''); addLog('> INPUT CLEARED') }
+  const atmClear = () => { setInput('') }
 
   const withdraw = async () => {
     const amt = parseInt(input)
@@ -156,8 +156,8 @@ export default function AtmPage() {
                   setSelectedAccount(e.target.value)
                   const acc = accounts.find(a => a.accountNumber === e.target.value)
                   if (acc) setBalance(acc.balance || 0)
-                }} style={{ width: '100%', background: 'rgba(0,255,178,0.05)', border: '1px solid rgba(0,255,178,0.2)', borderRadius: '10px', padding: '8px', color: '#F0EFEA', fontSize: '11px', outline: 'none' }}>
-                  {accounts.map(acc => <option key={acc.id} value={acc.accountNumber}>{acc.accountType}</option>)}
+                }} style={{ width: '100%', background: '#060A12', border: '1px solid rgba(0,255,178,0.3)', borderRadius: '10px', padding: '8px', color: '#00FFB2', fontSize: '11px', outline: 'none', fontWeight: '600' }}>
+                  {accounts.map(acc => <option key={acc.id} value={acc.accountNumber} style={{ background: '#060A12', color: '#00FFB2' }}>{acc.accountType}</option>)}
                 </select>
               </div>
             )}

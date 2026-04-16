@@ -13,3 +13,20 @@ body {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: #060A12; }
 ::-webkit-scrollbar-thumb { background: #C9A62A; border-radius: 4px; }
+
+/* Fix for select/combo box options visibility */
+select {
+  color-scheme: dark;
+}
+select option {
+  background: #1a2332;
+  color: #F0EFEA;
+}
+select option:checked {
+  background: #00FFB2;
+  color: #060A12;
+}
+select option:hover {
+  background: #00FFB2;
+  color: #060A12;
+}
