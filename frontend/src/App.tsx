@@ -4,6 +4,7 @@ import { store } from './store/store'
 import { Toaster } from 'react-hot-toast'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import MultiStepRegistration from './pages/MultiStepRegistration'
 import Dashboard from './pages/Dashboard'
 import AccountPage from './pages/AccountPage'
 import TransactionPage from './pages/TransactionPage'
@@ -23,6 +24,7 @@ function App() {
         <Routes>
           <Route path="/login"            element={<LoginPage />} />
           <Route path="/register"         element={<RegisterPage />} />
+          <Route path="/register-account" element={<MultiStepRegistration />} />
           <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
           <Route path="/"            element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/accounts"    element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />

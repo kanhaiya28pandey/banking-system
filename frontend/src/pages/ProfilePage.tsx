@@ -16,7 +16,7 @@ export default function ProfilePage() {
   const [pwdLoading, setPwdLoading] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [tab, setTab] = useState<'info'|'security'>('info')
+  const [tab, setTab] = useState<'info'|'security'|'kyc'>('info')
   const headers = { headers: { Authorization: `Bearer ${token}` } }
 
   useEffect(() => { if (user) setForm({ name: user.name||'', phone: user.phone||'' }) }, [user])
@@ -81,7 +81,7 @@ export default function ProfilePage() {
 
           <div>
             <div style={{ display: 'flex', gap: '4px', background: 'rgba(10,18,32,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '5px', marginBottom: '24px', width: 'fit-content' }}>
-              {[{ key: 'info' as const, label: '👤 Profile Info' }, { key: 'security' as const, label: '🔐 Change Password' }].map(t => (
+              {[{ key: 'info' as const, label: '👤 Profile Info' }, { key: 'kyc' as const, label: '🆔 KYC Info' }, { key: 'security' as const, label: '🔐 Change Password' }].map(t => (
                 <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '11px 24px', borderRadius: '10px', border: 'none', background: tab === t.key ? 'linear-gradient(135deg, #F5C842, #D4A017)' : 'transparent', color: tab === t.key ? '#060A12' : '#7A8FA6', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>{t.label}</button>
               ))}
             </div>
@@ -126,6 +126,71 @@ export default function ProfilePage() {
                     {pwd.confirmPassword && <div style={{ marginTop: '8px', fontSize: '12px', color: pwd.newPassword===pwd.confirmPassword?'#00FFB2':'#FF4D6D' }}>{pwd.newPassword===pwd.confirmPassword?'✓ Match':'✗ No match'}</div>}
                   </div>
                   <button onClick={handleChangePwd} disabled={pwdLoading} style={{ background: 'linear-gradient(135deg, #F5C842, #D4A017)', color: '#060A12', border: 'none', borderRadius: '12px', padding: '16px 40px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1.5px', opacity: pwdLoading?0.7:1 }}>{pwdLoading?'CHANGING...':'CHANGE PASSWORD →'}</button>
+                </>
+              )}
+              {tab === 'kyc' && (
+                <>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#F5C842', marginBottom: '28px', letterSpacing: '2px' }}>KYC & PERSONAL INFORMATION</div>
+
+                  {/* Personal Details Section */}
+                  <div style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div style={{ fontSize: '12px', color: '#00FFB2', fontWeight: '700', marginBottom: '16px', letterSpacing: '1px' }}>PERSONAL DETAILS</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                      {[
+                        { label: 'Full Name', value: user?.name || 'Not set' },
+                        { label: 'Email', value: user?.email || 'Not set' },
+                        { label: 'Phone', value: user?.phone || 'Not set' },
+                        { label: 'Address', value: user?.address || 'Not set' },
+                        { label: 'City', value: user?.city || 'Not set' },
+                        { label: 'State', value: user?.state || 'Not set' }
+                      ].map((item, i) => (
+                        <div key={i}>
+                          <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '1px', display: 'block', marginBottom: '6px', fontWeight: '700' }}>{item.label}</label>
+                          <div style={{ fontSize: '14px', color: '#F0EFEA', background: 'rgba(255,255,255,0.04)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* KYC Information Section */}
+                  <div style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div style={{ fontSize: '12px', color: '#3B9EFF', fontWeight: '700', marginBottom: '16px', letterSpacing: '1px' }}>KYC INFORMATION</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                      {[
+                        { label: 'Religion', value: user?.religion || 'Not provided' },
+                        { label: 'Category', value: user?.category || 'Not provided' },
+                        { label: 'Income Range', value: user?.incomeRange || 'Not provided' },
+                        { label: 'Educational Qualification', value: user?.educationalQualification || 'Not provided' },
+                        { label: 'Occupation', value: user?.occupation || 'Not provided' },
+                        { label: 'PAN Number', value: user?.panNumber || 'Not provided' },
+                        { label: 'Aadhaar Number', value: user?.aadhaarNumber ? user.aadhaarNumber.slice(-4).padStart(user.aadhaarNumber.length, '*') : 'Not provided' },
+                        { label: 'Senior Citizen', value: user?.seniorCitizen ? 'Yes' : 'No' }
+                      ].map((item, i) => (
+                        <div key={i}>
+                          <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '1px', display: 'block', marginBottom: '6px', fontWeight: '700' }}>{item.label}</label>
+                          <div style={{ fontSize: '14px', color: '#F0EFEA', background: 'rgba(255,255,255,0.04)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Account Details Section */}
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#00FFB2', fontWeight: '700', marginBottom: '16px', letterSpacing: '1px' }}>ACCOUNT DETAILS</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                      {[
+                        { label: 'Account Type', value: user?.accountType || 'Not set' },
+                        { label: 'KYC Status', value: user?.kycVerified ? '✅ Verified' : '⏳ Pending' },
+                        { label: 'Account Status', value: user?.status || 'ACTIVE' },
+                        { label: 'User Type', value: user?.userType || 'NORMAL' }
+                      ].map((item, i) => (
+                        <div key={i}>
+                          <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '1px', display: 'block', marginBottom: '6px', fontWeight: '700' }}>{item.label}</label>
+                          <div style={{ fontSize: '14px', color: '#F0EFEA', background: 'rgba(255,255,255,0.04)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </>
               )}
             </div>

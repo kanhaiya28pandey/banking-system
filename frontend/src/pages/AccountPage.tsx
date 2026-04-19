@@ -1,16 +1,15 @@
 ﻿import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import toast from 'react-hot-toast'
 import api from '../api/axiosInstance'
 
 export default function AccountPage() {
   const { user, token } = useSelector((s: any) => s.auth)
+  const navigate = useNavigate()
   const [accounts, setAccounts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
-  const [accType, setAccType] = useState('SAVINGS')
-  const [creating, setCreating] = useState(false)
   const headers = { headers: { Authorization: `Bearer ${token}` } }
 
   const fetchAccounts = async () => {
@@ -35,22 +34,6 @@ export default function AccountPage() {
 
   useEffect(() => { fetchAccounts() }, [user])
 
-  const handleCreate = async () => {
-    if (!user?.id) { toast.error('Please re-login'); return }
-    setCreating(true)
-    try {
-      const res = await api.post(
-        `/account/create?userId=${user.id}&accountType=${accType}`,
-        {}, headers)
-      if (res.data.success) {
-        toast.success(`${accType} account created!`)
-        setShowCreate(false)
-        fetchAccounts()
-      } else { toast.error(res.data.message) }
-    } catch (err: any) { toast.error(err.response?.data?.message || 'Failed') }
-    setCreating(false)
-  }
-
   const colors = ['#F5C842', '#3B9EFF', '#00FFB2', '#FF4D6D']
   const icons = ['💰', '💼', '🏦', '💳']
   const total = accounts.reduce((s, a) => s + (a.balance || 0), 0)
@@ -65,7 +48,7 @@ export default function AccountPage() {
             <div style={{ fontSize: '34px', fontWeight: '700' }}>My <span style={{ color: '#F5C842' }}>Accounts</span></div>
             <div style={{ fontSize: '14px', color: '#4A6080', marginTop: '6px' }}>{accounts.length} account(s) · Live from MongoDB</div>
           </div>
-          <button onClick={() => setShowCreate(!showCreate)} style={{
+          <button onClick={() => navigate('/register-account')} style={{
             background: 'linear-gradient(135deg, #F5C842, #D4A017)', color: '#060A12',
             border: 'none', borderRadius: '12px', padding: '14px 24px',
             fontSize: '12px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1.5px'
@@ -87,23 +70,6 @@ export default function AccountPage() {
           ))}
         </div>
 
-        {showCreate && (
-          <div style={{ background: 'rgba(10,18,32,0.9)', border: '1px solid rgba(245,200,66,0.2)', borderRadius: '18px', padding: '28px', marginBottom: '24px' }}>
-            <div style={{ fontSize: '13px', fontWeight: '700', color: '#F5C842', marginBottom: '20px', letterSpacing: '2px' }}>✦ CREATE NEW ACCOUNT</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', alignItems: 'end' }}>
-              <div>
-                <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>ACCOUNT TYPE</label>
-                <select value={accType} onChange={e => setAccType(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '14px 18px', color: '#F0EFEA', fontSize: '15px', outline: 'none' }}>
-                  <option value="SAVINGS">💰 Savings Account</option>
-                  <option value="CURRENT">💼 Current Account</option>
-                </select>
-              </div>
-              <button onClick={handleCreate} disabled={creating} style={{ background: 'linear-gradient(135deg, #F5C842, #D4A017)', color: '#060A12', border: 'none', borderRadius: '12px', padding: '14px 28px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1.5px', opacity: creating ? 0.7 : 1, whiteSpace: 'nowrap' as const }}>
-                {creating ? 'CREATING...' : 'CREATE →'}
-              </button>
-            </div>
-          </div>
-        )}
 
         {loading && <div style={{ textAlign: 'center', padding: '60px', color: '#4A6080', fontSize: '13px', letterSpacing: '2px' }}>LOADING ACCOUNTS...</div>}
 
@@ -112,7 +78,7 @@ export default function AccountPage() {
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏦</div>
             <div style={{ fontSize: '15px', color: '#F5C842', marginBottom: '8px', fontWeight: '700' }}>NO ACCOUNTS YET</div>
             <div style={{ fontSize: '13px', color: '#4A6080', marginBottom: '24px' }}>Create your first bank account to get started</div>
-            <button onClick={() => setShowCreate(true)} style={{ background: 'linear-gradient(135deg, #F5C842, #D4A017)', color: '#060A12', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1.5px' }}>+ CREATE FIRST ACCOUNT</button>
+            <button onClick={() => navigate('/register-account')} style={{ background: 'linear-gradient(135deg, #F5C842, #D4A017)', color: '#060A12', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1.5px' }}>+ CREATE FIRST ACCOUNT</button>
           </div>
         )}
 
