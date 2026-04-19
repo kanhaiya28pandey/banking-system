@@ -146,6 +146,43 @@ public class TransactionService {
         return saved;
     }
 
+    // ============ PIN-VERIFIED TRANSACTION METHODS ============
+
+    private void verifyTransactionPin(String accountNumber, String providedPin) {
+        Account account = accountRepository
+            .findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new RuntimeException("Account not found"));
+        Optional<User> user = userRepository.findById(account.getUserId());
+        if (user.isEmpty()) {
+            throw new RuntimeException("User not found for account");
+        }
+        String storedPin = user.get().getTransactionPin();
+        if (storedPin == null || storedPin.isEmpty()) {
+            throw new RuntimeException("No transaction PIN set. Please set a PIN first.");
+        }
+        if (!storedPin.equals(providedPin)) {
+            throw new RuntimeException("Invalid transaction PIN");
+        }
+    }
+
+    @Transactional
+    public Transaction withdrawWithPin(String accountNumber, Double amount, String transactionPin) {
+        verifyTransactionPin(accountNumber, transactionPin);
+        return withdraw(accountNumber, amount);
+    }
+
+    @Transactional
+    public Transaction depositWithPin(String accountNumber, Double amount, String transactionPin) {
+        verifyTransactionPin(accountNumber, transactionPin);
+        return deposit(accountNumber, amount);
+    }
+
+    @Transactional
+    public Transaction transferWithPin(TransactionRequest req, String transactionPin) {
+        verifyTransactionPin(req.getFromAccount(), transactionPin);
+        return transfer(req);
+    }
+
     public List<Transaction> getHistory(String accountNumber) {
         return transactionRepository
             .findByFromAccountOrToAccountOrderByDateDesc(

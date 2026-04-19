@@ -8,4 +8,5 @@ public class TransactionRequest {
     private String toAccount;
     private Double amount;
     private String description;
+    private String transactionPin;  // PIN for transaction verification
 }

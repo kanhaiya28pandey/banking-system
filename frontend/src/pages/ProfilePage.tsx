@@ -17,9 +17,24 @@ export default function ProfilePage() {
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [tab, setTab] = useState<'info'|'security'|'kyc'>('info')
+  const [accounts, setAccounts] = useState<any[]>([])
   const headers = { headers: { Authorization: `Bearer ${token}` } }
 
   useEffect(() => { if (user) setForm({ name: user.name||'', phone: user.phone||'' }) }, [user])
+
+  useEffect(() => {
+    if (user?.id) {
+      const fetchAccounts = async () => {
+        try {
+          const res = await api.get(`/account/user/${user.id}`, headers)
+          setAccounts(res.data.data || [])
+        } catch (err) {
+          console.error('Failed to load accounts:', err)
+        }
+      }
+      fetchAccounts()
+    }
+  }, [user?.id, token])
 
   const handleUpdate = async () => {
     if (!form.name||!form.phone) { toast.error('Fill all fields'); return }
@@ -177,19 +192,34 @@ export default function ProfilePage() {
                   {/* Account Details Section */}
                   <div>
                     <div style={{ fontSize: '12px', color: '#00FFB2', fontWeight: '700', marginBottom: '16px', letterSpacing: '1px' }}>ACCOUNT DETAILS</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                      {[
-                        { label: 'Account Type', value: user?.accountType || 'Not set' },
-                        { label: 'KYC Status', value: user?.kycVerified ? '✅ Verified' : '⏳ Pending' },
-                        { label: 'Account Status', value: user?.status || 'ACTIVE' },
-                        { label: 'User Type', value: user?.userType || 'NORMAL' }
-                      ].map((item, i) => (
-                        <div key={i}>
-                          <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '1px', display: 'block', marginBottom: '6px', fontWeight: '700' }}>{item.label}</label>
-                          <div style={{ fontSize: '14px', color: '#F0EFEA', background: 'rgba(255,255,255,0.04)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>{item.value}</div>
-                        </div>
-                      ))}
-                    </div>
+                    {accounts.length === 0 ? (
+                      <div style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', textAlign: 'center', color: '#4A6080' }}>No accounts created yet</div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+                        {accounts.map((acc, i) => (
+                          <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '12px' }}>
+                              <div>
+                                <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '1px', display: 'block', marginBottom: '4px', fontWeight: '700' }}>ACCOUNT NUMBER</label>
+                                <div style={{ fontSize: '13px', color: '#F5C842', fontFamily: 'monospace', fontWeight: '700' }}>{acc.accountNumber}</div>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '1px', display: 'block', marginBottom: '4px', fontWeight: '700' }}>ACCOUNT TYPE</label>
+                                <div style={{ fontSize: '13px', color: '#F0EFEA' }}>{acc.accountType}</div>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '1px', display: 'block', marginBottom: '4px', fontWeight: '700' }}>BALANCE</label>
+                                <div style={{ fontSize: '13px', color: '#00FFB2', fontWeight: '700' }}>₹{(acc.balance || 0).toLocaleString('en-IN')}</div>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '1px', display: 'block', marginBottom: '4px', fontWeight: '700' }}>STATUS</label>
+                                <div style={{ fontSize: '13px', color: acc.status === 'ACTIVE' ? '#00FFB2' : '#FF4D6D' }}>● {acc.status}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}

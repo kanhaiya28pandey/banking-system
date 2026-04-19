@@ -4,6 +4,7 @@ import com.banking.dto.ApiResponse;
 import com.banking.dto.TransactionRequest;
 import com.banking.dto.TransactionResponse;
 import com.banking.dto.TransactionFilterRequest;
+import com.banking.dto.TransactionWithPinRequest;
 import com.banking.model.Transaction;
 import com.banking.model.Account;
 import com.banking.model.User;
@@ -66,14 +67,46 @@ public class TransactionController {
         }
     }
 
-    @PostMapping("/transfer")
-    public ResponseEntity<ApiResponse<TransactionResponse>> transfer(
-            @RequestBody TransactionRequest req) {
+    @PostMapping("/withdraw-with-pin")
+    public ResponseEntity<ApiResponse<TransactionResponse>> withdrawWithPin(
+            @RequestBody TransactionWithPinRequest req) {
         try {
-            Transaction tx = transactionService.transfer(req);
+            Transaction tx = transactionService.withdrawWithPin(req.getAccountNumber(), req.getAmount(), req.getTransactionPin());
             TransactionResponse response = TransactionResponse.fromTransaction(tx);
             return ResponseEntity.ok(new ApiResponse<>(
-                true, "Transfer successful. Receipt link included.", response));
+                true, "Withdrawal successful with PIN verification. Receipt link included.", response));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ApiResponse<>(
+                false, e.getMessage(), null));
+        }
+    }
+
+    @PostMapping("/deposit-with-pin")
+    public ResponseEntity<ApiResponse<TransactionResponse>> depositWithPin(
+            @RequestBody TransactionWithPinRequest req) {
+        try {
+            Transaction tx = transactionService.depositWithPin(req.getAccountNumber(), req.getAmount(), req.getTransactionPin());
+            TransactionResponse response = TransactionResponse.fromTransaction(tx);
+            return ResponseEntity.ok(new ApiResponse<>(
+                true, "Deposit successful with PIN verification. Receipt link included.", response));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ApiResponse<>(
+                false, e.getMessage(), null));
+        }
+    }
+
+    @PostMapping("/transfer-with-pin")
+    public ResponseEntity<ApiResponse<TransactionResponse>> transferWithPin(
+            @RequestBody TransactionRequest req) {
+        try {
+            String pin = req.getTransactionPin();
+            if (pin == null || pin.isEmpty()) {
+                return ResponseEntity.ok(new ApiResponse<>(false, "Transaction PIN required", null));
+            }
+            Transaction tx = transactionService.transferWithPin(req, pin);
+            TransactionResponse response = TransactionResponse.fromTransaction(tx);
+            return ResponseEntity.ok(new ApiResponse<>(
+                true, "Transfer successful with PIN verification. Receipt link included.", response));
         } catch (Exception e) {
             return ResponseEntity.ok(new ApiResponse<>(
                 false, e.getMessage(), null));
