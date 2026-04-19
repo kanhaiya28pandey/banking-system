@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import Sidebar from '../components/Sidebar'
+import PinModal from '../components/PinModal'
 import toast from 'react-hot-toast'
 import api from '../api/axiosInstance'
 import { downloadReceipt } from '../api/transactionApi'
@@ -16,7 +17,6 @@ export default function AtmPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [hasTransactionPin, setHasTransactionPin] = useState(false)
   const [showPinModal, setShowPinModal] = useState(false)
-  const [pinInput, setPinInput] = useState('')
   const [pendingTransaction, setPendingTransaction] = useState<{ type: 'withdraw' | 'deposit', amount: number } | null>(null)
   const headers = { headers: { Authorization: `Bearer ${token}` } }
 
@@ -72,18 +72,7 @@ export default function AtmPage() {
   const atmKey = (v: string) => setInput(p => p + v)
   const atmClear = () => { setInput('') }
 
-  const pinKey = (v: string) => {
-    if (v === 'CLR') {
-      setPinInput('')
-    } else if (v === 'CONFIRM') {
-      processPendingTransaction()
-    } else {
-      setPinInput(p => p + v)
-    }
-  }
-
-  const processPendingTransaction = async () => {
-    if (!pinInput) { toast.error('Enter PIN'); return }
+  const processPendingTransaction = async (pin: string) => {
     if (!pendingTransaction) return
 
     try {
@@ -91,7 +80,7 @@ export default function AtmPage() {
       const res = await api.post(endpoint, {
         accountNumber: selectedAccount,
         amount: pendingTransaction.amount,
-        transactionPin: pinInput
+        transactionPin: pin
       }, headers)
 
       if (res.data.success) {
@@ -114,8 +103,6 @@ export default function AtmPage() {
       toast.error('Transaction failed: ' + (err.response?.data?.message || 'Invalid PIN'))
     }
 
-    setShowPinModal(false)
-    setPinInput('')
     setPendingTransaction(null)
     setInput('')
   }
@@ -282,34 +269,13 @@ export default function AtmPage() {
         </div>
       </main>
 
-      {/* PIN Entry Modal */}
-      {showPinModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'linear-gradient(160deg, #0D1829, #080E1A)', border: '2px solid rgba(245,200,66,0.3)', borderRadius: '24px', padding: '32px', maxWidth: '400px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}>
-            <div style={{ fontSize: '14px', color: '#F5C842', fontWeight: '700', marginBottom: '8px', letterSpacing: '2px' }}>TRANSACTION PIN REQUIRED</div>
-            <div style={{ fontSize: '12px', color: '#4A6080', marginBottom: '24px' }}>Enter your 4-digit PIN to confirm</div>
-
-            {/* PIN Display */}
-            <div style={{ background: 'rgba(0,255,178,0.05)', border: '1px solid rgba(0,255,178,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', fontSize: '24px', letterSpacing: '4px', color: '#00FFB2', fontWeight: '700', minHeight: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {'•'.repeat(pinInput.length)}{pinInput.length === 0 && '····'}
-            </div>
-
-            {/* PIN Keypad */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '16px' }}>
-              {['1','2','3','4','5','6','7','8','9','','0',''].map((k, i) => (
-                <button key={i} onClick={() => k && pinKey(k)} disabled={k === ''} style={{ background: k === '' ? 'transparent' : 'rgba(245,200,66,0.1)', border: k === '' ? 'none' : '1px solid rgba(245,200,66,0.25)', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '700', color: '#F5C842', cursor: k === '' ? 'default' : 'pointer', opacity: k === '' ? 0 : 1 }}>{k}</button>
-              ))}
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <button onClick={() => { setShowPinModal(false); setPinInput(''); setPendingTransaction(null) }} style={{ background: 'rgba(255,77,109,0.1)', border: '1px solid rgba(255,77,109,0.3)', color: '#FF4D6D', borderRadius: '10px', padding: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1px' }}>CANCEL</button>
-              <button onClick={() => pinKey('CLR')} style={{ background: 'rgba(255,77,109,0.1)', border: '1px solid rgba(255,77,109,0.3)', color: '#FF4D6D', borderRadius: '10px', padding: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1px' }}>CLEAR</button>
-              <button onClick={processPendingTransaction} disabled={pinInput.length !== 4} style={{ gridColumn: '1/3', background: pinInput.length === 4 ? 'linear-gradient(135deg, #F5C842, #D4A017)' : 'rgba(245,200,66,0.1)', color: pinInput.length === 4 ? '#060A12' : '#4A6080', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '11px', fontWeight: '700', cursor: pinInput.length === 4 ? 'pointer' : 'not-allowed', letterSpacing: '1px', opacity: pinInput.length === 4 ? 1 : 0.5 }}>CONFIRM PIN</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PinModal
+        isOpen={showPinModal}
+        onClose={() => { setShowPinModal(false); setPendingTransaction(null) }}
+        onConfirm={processPendingTransaction}
+        title="ATM TRANSACTION PIN"
+        description="Enter your 4-digit PIN to complete the transaction"
+      />
     </div>
   )
 }

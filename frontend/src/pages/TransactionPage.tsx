@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import Sidebar from '../components/Sidebar'
+import PinModal from '../components/PinModal'
 import TransactionFilters from '../components/TransactionFilters'
 import ExportButtons from '../components/ExportButtons'
 import toast from 'react-hot-toast'
@@ -24,6 +25,9 @@ export default function TransactionPage() {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [searchLoading, setSearchLoading] = useState(false)
+  const [hasTransactionPin, setHasTransactionPin] = useState(false)
+  const [showPinModal, setShowPinModal] = useState(false)
+  const [pendingTransaction, setPendingTransaction] = useState<{ type: 'deposit' | 'withdraw' | 'transfer', amount: number } | null>(null)
   const headers = { headers: { Authorization: `Bearer ${token}` } }
 
   useEffect(() => {
@@ -33,6 +37,9 @@ export default function TransactionPage() {
       setAccounts(accs)
       if (accs.length > 0) { setSelectedAcc(accs[0].accountNumber); setFrom(accs[0].accountNumber) }
     }).catch(() => {})
+
+    // Check if user has transaction PIN set
+    setHasTransactionPin(!!(user?.transactionPin && user.transactionPin.length > 0))
   }, [user])
 
   const fetchHistory = async (accNum: string) => {
@@ -75,35 +82,81 @@ export default function TransactionPage() {
     setSearchLoading(false)
   }
 
-  const handleDeposit = async () => {
+  const handleDeposit = async (pin?: string) => {
     if (!amount || !selectedAcc) { toast.error('Select account and enter amount'); return }
+
+    if (hasTransactionPin && !pin) {
+      setPendingTransaction({ type: 'deposit', amount: parseFloat(amount) })
+      setShowPinModal(true)
+      return
+    }
+
     setLoading(true)
     try {
-      await api.post(`/transaction/deposit?accountNumber=${selectedAcc}&amount=${amount}`, {}, headers)
+      const endpoint = hasTransactionPin ? '/transaction/deposit-with-pin' : `/transaction/deposit?accountNumber=${selectedAcc}&amount=${amount}`
+      const method = hasTransactionPin ? 'post' : 'post'
+      const data = hasTransactionPin ? { accountNumber: selectedAcc, amount: parseFloat(amount), transactionPin: pin } : {}
+
+      await api[method](endpoint, data, headers)
       toast.success(`₹${amount} deposited!`); setAmount(''); refreshAccounts()
     } catch (err: any) { toast.error(err.response?.data?.message || 'Deposit failed') }
     setLoading(false)
   }
 
-  const handleWithdraw = async () => {
+  const handleWithdraw = async (pin?: string) => {
     if (!amount || !selectedAcc) { toast.error('Select account and enter amount'); return }
+
+    if (hasTransactionPin && !pin) {
+      setPendingTransaction({ type: 'withdraw', amount: parseFloat(amount) })
+      setShowPinModal(true)
+      return
+    }
+
     setLoading(true)
     try {
-      await api.post(`/transaction/withdraw?accountNumber=${selectedAcc}&amount=${amount}`, {}, headers)
+      const endpoint = hasTransactionPin ? '/transaction/withdraw-with-pin' : `/transaction/withdraw?accountNumber=${selectedAcc}&amount=${amount}`
+      const data = hasTransactionPin ? { accountNumber: selectedAcc, amount: parseFloat(amount), transactionPin: pin } : {}
+
+      await api.post(endpoint, data, headers)
       toast.success(`₹${amount} withdrawn!`); setAmount(''); refreshAccounts()
     } catch (err: any) { toast.error(err.response?.data?.message || 'Insufficient balance') }
     setLoading(false)
   }
 
-  const handleTransfer = async () => {
+  const handleTransfer = async (pin?: string) => {
     if (!fromAcc || !toAcc || !amount) { toast.error('Fill all fields'); return }
     if (fromAcc === toAcc) { toast.error('Same account'); return }
+
+    if (hasTransactionPin && !pin) {
+      setPendingTransaction({ type: 'transfer', amount: parseFloat(amount) })
+      setShowPinModal(true)
+      return
+    }
+
     setLoading(true)
     try {
-      await api.post('/transaction/transfer', { fromAccount: fromAcc, toAccount: toAcc, amount: parseFloat(amount), description: 'Transfer' }, headers)
+      const endpoint = hasTransactionPin ? '/transaction/transfer-with-pin' : '/transaction/transfer'
+      const data = { fromAccount: fromAcc, toAccount: toAcc, amount: parseFloat(amount), description: 'Transfer', ...(hasTransactionPin && { transactionPin: pin }) }
+
+      await api.post(endpoint, data, headers)
       toast.success(`₹${amount} transferred!`); setAmount(''); setTo(''); refreshAccounts()
     } catch (err: any) { toast.error(err.response?.data?.message || 'Transfer failed') }
     setLoading(false)
+  }
+
+  const processPinConfirm = (pin: string) => {
+    if (!pendingTransaction) return
+    setShowPinModal(false)
+
+    if (pendingTransaction.type === 'deposit') {
+      handleDeposit(pin)
+    } else if (pendingTransaction.type === 'withdraw') {
+      handleWithdraw(pin)
+    } else if (pendingTransaction.type === 'transfer') {
+      handleTransfer(pin)
+    }
+
+    setPendingTransaction(null)
   }
 
   const handleDownloadReceipt = async (transactionId: string) => {
@@ -306,6 +359,14 @@ export default function TransactionPage() {
           </div>
         </div>
       </main>
+
+      <PinModal
+        isOpen={showPinModal}
+        onClose={() => { setShowPinModal(false); setPendingTransaction(null) }}
+        onConfirm={processPinConfirm}
+        title="TRANSACTION PIN REQUIRED"
+        description="Enter your 4-digit PIN to confirm the transaction"
+      />
     </div>
   )
 }
