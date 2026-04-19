@@ -27,13 +27,17 @@ export default function LoginPage() {
           `/user/by-email?email=${email}`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
-        dispatch(setCredentials({ user: userRes.data.data, token }))
+        const user = userRes.data.data
+        console.log('User object received:', user)
+        console.log('User ID:', user.id, 'Length:', user.id?.length)
+        dispatch(setCredentials({ user, token }))
         toast.success('Access granted!')
         navigate('/')
       } else {
         toast.error(res.data.message)
       }
-    } catch {
+    } catch (err: any) {
+      console.error('Login error:', err)
       toast.error('Authentication failed.')
     }
     setLoading(false)

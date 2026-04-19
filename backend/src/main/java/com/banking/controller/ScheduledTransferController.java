@@ -50,12 +50,15 @@ public class ScheduledTransferController {
                 Optional<User> user = userRepository.findByEmail(email);
                 if (user.isPresent()) {
                     return user.get().getId();
+                } else {
+                    throw new RuntimeException("User not found for email: " + email);
                 }
             } catch (Exception e) {
                 System.err.println("JWT extraction failed: " + e.getMessage());
+                throw new RuntimeException("JWT extraction failed: " + e.getMessage());
             }
         }
-        throw new RuntimeException("Unauthorized");
+        throw new RuntimeException("No Authorization header found");
     }
 
     @PostMapping("/create")
@@ -66,8 +69,12 @@ public class ScheduledTransferController {
             String userId = extractUserIdFromToken(request);
             ScheduledTransaction st = scheduledTxnService.createScheduledTransfer(userId, req);
             return ResponseEntity.ok(new ApiResponse<>(true, "Scheduled transfer created", ScheduledTransferResponse.fromScheduledTransaction(st)));
+        } catch (RuntimeException e) {
+            System.err.println("Error in createScheduledTransfer: " + e.getMessage());
+            return ResponseEntity.status(401).body(new ApiResponse<>(false, e.getMessage(), null));
         } catch (Exception e) {
-            return ResponseEntity.status(403).body(new ApiResponse<>(false, "Unauthorized: " + e.getMessage(), null));
+            System.err.println("Unexpected error in createScheduledTransfer: " + e.getMessage());
+            return ResponseEntity.status(500).body(new ApiResponse<>(false, "Server error: " + e.getMessage(), null));
         }
     }
 
@@ -80,8 +87,12 @@ public class ScheduledTransferController {
                 .map(ScheduledTransferResponse::fromScheduledTransaction)
                 .collect(Collectors.toList());
             return ResponseEntity.ok(new ApiResponse<>(true, "Scheduled transfers retrieved", responses));
+        } catch (RuntimeException e) {
+            System.err.println("Error in getScheduledTransfers: " + e.getMessage());
+            return ResponseEntity.status(401).body(new ApiResponse<>(false, e.getMessage(), null));
         } catch (Exception e) {
-            return ResponseEntity.status(403).body(new ApiResponse<>(false, "Unauthorized: " + e.getMessage(), null));
+            System.err.println("Unexpected error in getScheduledTransfers: " + e.getMessage());
+            return ResponseEntity.status(500).body(new ApiResponse<>(false, "Server error: " + e.getMessage(), null));
         }
     }
 

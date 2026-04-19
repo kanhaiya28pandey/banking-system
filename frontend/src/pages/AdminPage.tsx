@@ -12,7 +12,7 @@ export default function AdminPage() {
 
   const fetchUsers = async () => {
     try {
-      const res = await api.get('http://localhost:8082/api/user/all', headers)
+      const res = await api.get('/user/all', headers)
       setUsers(res.data.data || [])
     } catch { toast.error('Failed to load users') }
     setLoading(false)

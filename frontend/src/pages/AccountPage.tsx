@@ -14,11 +14,22 @@ export default function AccountPage() {
   const headers = { headers: { Authorization: `Bearer ${token}` } }
 
   const fetchAccounts = async () => {
-    if (!user?.id) { setLoading(false); return }
+    console.log('User object in AccountPage:', user)
+    console.log('User ID:', user?.id, 'Type:', typeof user?.id, 'Length:', user?.id?.length)
+    if (!user?.id) {
+      console.error('User ID not found:', user)
+      setLoading(false)
+      return
+    }
     try {
       const res = await api.get(`/account/user/${user.id}`, headers)
       setAccounts(res.data.data || [])
-    } catch { toast.error('Failed to load accounts') }
+    } catch (err: any) {
+      console.error('Full error response:', err.response?.data)
+      const errorMsg = err.response?.data?.message || err.message || 'Unknown error'
+      console.error('Failed to load accounts:', errorMsg)
+      toast.error('Failed to load accounts: ' + errorMsg)
+    }
     setLoading(false)
   }
 

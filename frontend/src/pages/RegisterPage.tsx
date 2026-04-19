@@ -22,12 +22,14 @@ export default function RegisterPage() {
     }
     setLoading(true)
     try {
-      const res = await api.post('http://localhost:8082/api/auth/register', form)
+      const res = await api.post('/auth/register', form)
       if (res.data.success) {
         toast.success('Account created! Please login.')
         navigate('/login')
       } else { toast.error(res.data.message) }
-    } catch { toast.error('Registration failed.') }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Registration failed.')
+    }
     setLoading(false)
   }
 

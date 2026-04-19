@@ -30,8 +30,9 @@ public class AuthService {
         user.setEmail(req.getEmail());
         user.setPassword(passwordEncoder.encode(req.getPassword()));
         user.setPhone(req.getPhone());
-        user.setRole(req.getRole() != null ? req.getRole() : "CUSTOMER");
+        user.setRole(req.getRole() != null ? req.getRole() : "USER");
         user.setStatus("ACTIVE");
+        user.setUserType("NORMAL");
         userRepository.save(user);
         return new ApiResponse<>(true, "Registered successfully", null);
     }
