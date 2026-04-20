@@ -106,18 +106,23 @@ export default function TransactionPage() {
 
     setLoading(true)
     try {
+      let res
       if (pin && hasTransactionPin) {
-        // PIN endpoint uses request body
-        await api.post('/transaction/deposit-with-pin', {
+        res = await api.post('/transaction/deposit-with-pin', {
           accountNumber: selectedAcc,
           amount: parseFloat(amount),
           transactionPin: pin
         })
       } else {
-        // Regular endpoint uses query parameters
-        await api.post(`/transaction/deposit?accountNumber=${selectedAcc}&amount=${amount}`, {})
+        res = await api.post(`/transaction/deposit?accountNumber=${selectedAcc}&amount=${amount}`, {})
       }
-      toast.success(`₹${amount} deposited!`)
+
+      // Check if API returned success: false
+      if (!res.data.success) {
+        throw new Error(res.data.message || 'Deposit failed')
+      }
+
+      toast.success(`✓ ₹${amount} deposited!`)
       setAmount('')
       refreshAccounts()
     } catch (err: any) {
@@ -138,18 +143,23 @@ export default function TransactionPage() {
 
     setLoading(true)
     try {
+      let res
       if (pin && hasTransactionPin) {
-        // PIN endpoint uses request body
-        await api.post('/transaction/withdraw-with-pin', {
+        res = await api.post('/transaction/withdraw-with-pin', {
           accountNumber: selectedAcc,
           amount: parseFloat(amount),
           transactionPin: pin
         })
       } else {
-        // Regular endpoint uses query parameters
-        await api.post(`/transaction/withdraw?accountNumber=${selectedAcc}&amount=${amount}`, {})
+        res = await api.post(`/transaction/withdraw?accountNumber=${selectedAcc}&amount=${amount}`, {})
       }
-      toast.success(`₹${amount} withdrawn!`)
+
+      // Check if API returned success: false
+      if (!res.data.success) {
+        throw new Error(res.data.message || 'Withdrawal failed')
+      }
+
+      toast.success(`✓ ₹${amount} withdrawn!`)
       setAmount('')
       refreshAccounts()
     } catch (err: any) {
@@ -171,9 +181,10 @@ export default function TransactionPage() {
 
     setLoading(true)
     try {
+      let res
       if (pin && hasTransactionPin) {
         // PIN endpoint uses request body
-        await api.post('/transaction/transfer-with-pin', {
+        res = await api.post('/transaction/transfer-with-pin', {
           fromAccount: fromAcc,
           toAccount: toAcc,
           amount: parseFloat(amount),
@@ -182,13 +193,19 @@ export default function TransactionPage() {
         })
       } else {
         // Regular endpoint uses request body
-        await api.post('/transaction/transfer', {
+        res = await api.post('/transaction/transfer', {
           fromAccount: fromAcc,
           toAccount: toAcc,
           amount: parseFloat(amount),
           description: 'Transfer'
         })
       }
+
+      // Check if API returned success: false
+      if (!res.data.success) {
+        throw new Error(res.data.message || 'Transfer failed')
+      }
+
       toast.success(`₹${amount} transferred!`)
       setAmount('')
       setTo('')

@@ -219,4 +219,87 @@ public class UserService {
         saved.setPassword(null);
         return saved;
     }
+
+    // Get all users for employee (all customers)
+    public List<User> getAllCustomersForEmployee() {
+        List<User> customers = userRepository.findByRole("USER");
+        customers.forEach(u -> u.setPassword(null));
+        return customers;
+    }
+
+    // Update user information by employee
+    @Transactional
+    public User updateUserByEmployee(String userId, User updateData, String employeeId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Only employees can update customer information
+        if (updateData.getFirstName() != null) user.setFirstName(updateData.getFirstName());
+        if (updateData.getLastName() != null) user.setLastName(updateData.getLastName());
+        if (updateData.getPhone() != null) user.setPhone(updateData.getPhone());
+        if (updateData.getAddress() != null) user.setAddress(updateData.getAddress());
+        if (updateData.getCity() != null) user.setCity(updateData.getCity());
+        if (updateData.getState() != null) user.setState(updateData.getState());
+        if (updateData.getPinCode() != null) user.setPinCode(updateData.getPinCode());
+
+        user.setUpdatedAt(LocalDateTime.now());
+        User saved = userRepository.save(user);
+        saved.setPassword(null);
+        return saved;
+    }
+
+    // Disable user account (not delete)
+    @Transactional
+    public User disableUserAccount(String userId, String employeeId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setAccountStatus("DISABLED");
+        user.setStatus("BLOCKED");
+        user.setUpdatedAt(LocalDateTime.now());
+        User saved = userRepository.save(user);
+        saved.setPassword(null);
+        return saved;
+    }
+
+    // Enable user account
+    @Transactional
+    public User enableUserAccount(String userId, String employeeId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setAccountStatus("VERIFIED");
+        user.setStatus("ACTIVE");
+        user.setUpdatedAt(LocalDateTime.now());
+        User saved = userRepository.save(user);
+        saved.setPassword(null);
+        return saved;
+    }
+
+    // Get pending verification accounts
+    public List<User> getPendingVerificationAccounts() {
+        List<User> pending = userRepository.findAll().stream()
+                .filter(u -> "PENDING_VERIFICATION".equals(u.getAccountStatus()) ||
+                             (u.getAccountStatus() == null && "USER".equals(u.getRole())))
+                .collect(Collectors.toList());
+        pending.forEach(u -> u.setPassword(null));
+        return pending;
+    }
+
+    // Verify user account by employee
+    @Transactional
+    public User verifyUserAccount(String userId, String employeeId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setAccountStatus("VERIFIED");
+        user.setVerifiedBy(employeeId);
+        user.setVerifiedAt(LocalDateTime.now());
+        user.setStatus("ACTIVE");
+        user.setUpdatedAt(LocalDateTime.now());
+
+        User saved = userRepository.save(user);
+        saved.setPassword(null);
+        return saved;
+    }
 }

@@ -31,7 +31,12 @@ public class User {
 
     // Roles and Status
     private String role; // ADMIN, MANAGER, EMPLOYEE, USER
-    private String status; // ACTIVE, BLOCKED, FROZEN, LOCKED
+    private String status; // ACTIVE, BLOCKED, FROZEN, LOCKED, DISABLED
+
+    // Account Verification Status
+    private String accountStatus; // PENDING_VERIFICATION, VERIFIED, SUSPENDED, DISABLED
+    private String verifiedBy;    // Employee/Manager ID who verified
+    private LocalDateTime verifiedAt;
 
     // ============ PHASE 1: PERSONAL DETAILS ============
     private String firstName;

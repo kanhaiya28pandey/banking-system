@@ -187,4 +187,93 @@ public class UserController {
                 new ApiResponse<>(false, e.getMessage(), null));
         }
     }
+
+    // ============ EMPLOYEE DASHBOARD ENDPOINTS ============
+
+    // Get all customers for employee
+    @GetMapping("/employees/all-customers")
+    public ResponseEntity<ApiResponse<List<User>>> getAllCustomers() {
+        try {
+            List<User> customers = userService.getAllCustomersForEmployee();
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Customers fetched", customers));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Get pending verification accounts
+    @GetMapping("/employees/pending-verifications")
+    public ResponseEntity<ApiResponse<List<User>>> getPendingVerifications() {
+        try {
+            List<User> pending = userService.getPendingVerificationAccounts();
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Pending accounts fetched", pending));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Update user by employee
+    @PutMapping("/employees/update-customer/{userId}")
+    public ResponseEntity<ApiResponse<User>> updateCustomer(
+            @PathVariable String userId,
+            @RequestParam String employeeId,
+            @RequestBody User updateData) {
+        try {
+            User updated = userService.updateUserByEmployee(userId, updateData, employeeId);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Customer updated", updated));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Verify user account by employee
+    @PostMapping("/employees/verify-account/{userId}")
+    public ResponseEntity<ApiResponse<User>> verifyAccount(
+            @PathVariable String userId,
+            @RequestParam String employeeId) {
+        try {
+            User verified = userService.verifyUserAccount(userId, employeeId);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Account verified successfully", verified));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Disable user account by employee
+    @PostMapping("/employees/disable-account/{userId}")
+    public ResponseEntity<ApiResponse<User>> disableAccount(
+            @PathVariable String userId,
+            @RequestParam String employeeId) {
+        try {
+            User disabled = userService.disableUserAccount(userId, employeeId);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Account disabled successfully", disabled));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Enable user account by employee
+    @PostMapping("/employees/enable-account/{userId}")
+    public ResponseEntity<ApiResponse<User>> enableAccount(
+            @PathVariable String userId,
+            @RequestParam String employeeId) {
+        try {
+            User enabled = userService.enableUserAccount(userId, employeeId);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Account enabled successfully", enabled));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
 }

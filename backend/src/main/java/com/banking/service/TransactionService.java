@@ -34,6 +34,14 @@ public class TransactionService {
             .orElseThrow(() -> new RuntimeException("Account not found"));
         if ("BLOCKED".equals(account.getStatus()))
             throw new RuntimeException("Account is blocked");
+
+        // Check if user account is verified
+        User user = userRepository.findById(account.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!"VERIFIED".equals(user.getAccountStatus())) {
+            throw new RuntimeException("Account not verified. Please wait for employee verification.");
+        }
+
         account.setBalance(account.getBalance() + amount);
         accountRepository.save(account);
         Transaction tx = new Transaction();
@@ -47,12 +55,9 @@ public class TransactionService {
 
         // Send notification
         try {
-            Optional<User> user = userRepository.findById(account.getUserId());
-            if (user.isPresent()) {
-                notificationService.sendTransactionNotification(saved, account, user.get());
-                // Broadcast balance update via WebSocket
-                websocketBalanceService.broadcastBalanceUpdate(account.getUserId(), accountNumber);
-            }
+            notificationService.sendTransactionNotification(saved, account, user);
+            // Broadcast balance update via WebSocket
+            websocketBalanceService.broadcastBalanceUpdate(account.getUserId(), accountNumber);
         } catch (Exception e) {
             System.err.println("Notification error: " + e.getMessage());
         }
@@ -67,6 +72,14 @@ public class TransactionService {
             .orElseThrow(() -> new RuntimeException("Account not found"));
         if ("BLOCKED".equals(account.getStatus()))
             throw new RuntimeException("Account is blocked");
+
+        // Check if user account is verified
+        User user = userRepository.findById(account.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!"VERIFIED".equals(user.getAccountStatus())) {
+            throw new RuntimeException("Account not verified. Please wait for employee verification.");
+        }
+
         if (account.getBalance() < amount)
             throw new RuntimeException("Insufficient balance");
         account.setBalance(account.getBalance() - amount);
@@ -82,12 +95,9 @@ public class TransactionService {
 
         // Send notification
         try {
-            Optional<User> user = userRepository.findById(account.getUserId());
-            if (user.isPresent()) {
-                notificationService.sendTransactionNotification(saved, account, user.get());
-                // Broadcast balance update via WebSocket
-                websocketBalanceService.broadcastBalanceUpdate(account.getUserId(), accountNumber);
-            }
+            notificationService.sendTransactionNotification(saved, account, user);
+            // Broadcast balance update via WebSocket
+            websocketBalanceService.broadcastBalanceUpdate(account.getUserId(), accountNumber);
         } catch (Exception e) {
             System.err.println("Notification error: " + e.getMessage());
         }
@@ -107,6 +117,14 @@ public class TransactionService {
             throw new RuntimeException("Source account is blocked");
         if ("BLOCKED".equals(to.getStatus()))
             throw new RuntimeException("Destination account is blocked");
+
+        // Check if sender account is verified
+        User senderUser = userRepository.findById(from.getUserId())
+                .orElseThrow(() -> new RuntimeException("Sender not found"));
+        if (!"VERIFIED".equals(senderUser.getAccountStatus())) {
+            throw new RuntimeException("Your account is not verified. Please wait for employee verification.");
+        }
+
         if (from.getBalance() < req.getAmount())
             throw new RuntimeException("Insufficient balance");
         from.setBalance(from.getBalance() - req.getAmount());
@@ -126,12 +144,9 @@ public class TransactionService {
 
         // Send notifications to both sender and receiver
         try {
-            Optional<User> senderUser = userRepository.findById(from.getUserId());
-            if (senderUser.isPresent()) {
-                notificationService.sendTransactionNotification(saved, from, senderUser.get());
-                // Broadcast balance update via WebSocket
-                websocketBalanceService.broadcastBalanceUpdate(from.getUserId(), req.getFromAccount());
-            }
+            notificationService.sendTransactionNotification(saved, from, senderUser);
+            // Broadcast balance update via WebSocket
+            websocketBalanceService.broadcastBalanceUpdate(from.getUserId(), req.getFromAccount());
 
             Optional<User> receiverUser = userRepository.findById(to.getUserId());
             if (receiverUser.isPresent()) {

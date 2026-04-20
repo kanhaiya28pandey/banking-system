@@ -221,4 +221,38 @@ public class TransactionController {
             return ResponseEntity.status(500).build();
         }
     }
+
+    // ============ EMPLOYEE VIEW ENDPOINTS ============
+
+    // Get all transactions for a user (employee view)
+    @GetMapping("/employee/user-transactions/{userId}")
+    public ResponseEntity<ApiResponse<List<Transaction>>> getUserTransactionsByEmployee(
+            @PathVariable String userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            List<Transaction> transactions = transactionRepository.findByFromAccountOrToAccountOrderByDateDesc(
+                    userId, userId);
+
+            return ResponseEntity.ok(new ApiResponse<>(
+                true, "User transactions fetched", transactions));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ApiResponse<>(
+                false, e.getMessage(), null));
+        }
+    }
+
+    // Get all transactions (employee/manager view - system-wide)
+    @GetMapping("/employee/all-transactions")
+    public ResponseEntity<ApiResponse<List<Transaction>>> getAllTransactions() {
+        try {
+            List<Transaction> transactions = transactionRepository.findAll();
+            return ResponseEntity.ok(new ApiResponse<>(
+                true, "All transactions fetched", transactions));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ApiResponse<>(
+                false, e.getMessage(), null));
+        }
+    }
 }
