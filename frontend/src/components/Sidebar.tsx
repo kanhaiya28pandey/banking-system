@@ -2,22 +2,65 @@
 import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../store/authSlice'
 
-const navItems = [
-  { label: 'Dashboard', path: '/', icon: '⬡' },
-  { label: 'Accounts', path: '/accounts', icon: '◈' },
-  { label: 'Transactions', path: '/transactions', icon: '⇄' },
-  { label: 'Scheduled Transfers', path: '/scheduled-transfers', icon: '⏲️' },
-  { label: 'ATM Console', path: '/atm', icon: '◉' },
-  { label: 'Profile', path: '/profile', icon: '👤' },
-  { label: 'Notifications', path: '/settings/notifications', icon: '🔔' },
-  { label: 'Admin Panel', path: '/admin', icon: '⬟' },
-]
+const getNavItems = (role: string) => {
+  const baseItems = [
+    { label: 'Dashboard', path: '/', icon: '⬡' },
+    { label: 'Transactions', path: '/transactions', icon: '⇄' },
+    { label: 'Profile', path: '/profile', icon: '👤' },
+    { label: 'Notifications', path: '/settings/notifications', icon: '🔔' },
+  ]
+
+  if (role === 'ADMIN') {
+    return [
+      ...baseItems,
+      { label: 'Admin Dashboard', path: '/admin-dashboard', icon: '⬟' },
+      { label: 'Admin Panel', path: '/admin', icon: '⬟' },
+    ]
+  } else if (role === 'MANAGER') {
+    return [
+      ...baseItems,
+      { label: 'Manager Dashboard', path: '/manager-dashboard', icon: '⬟' },
+    ]
+  } else if (role === 'EMPLOYEE') {
+    return [
+      ...baseItems,
+      { label: 'Employee Dashboard', path: '/employee-dashboard', icon: '⬟' },
+      { label: 'Accounts', path: '/accounts', icon: '◈' },
+    ]
+  } else {
+    // USER role
+    return [
+      ...baseItems,
+      { label: 'Accounts', path: '/accounts', icon: '◈' },
+      { label: 'Scheduled Transfers', path: '/scheduled-transfers', icon: '⏲️' },
+      { label: 'ATM Console', path: '/atm', icon: '◉' },
+    ]
+  }
+}
+
+const getRoleColor = (role: string) => {
+  if (role === 'ADMIN') return '#F5C842'
+  if (role === 'MANAGER') return '#3B9EFF'
+  if (role === 'EMPLOYEE') return '#00FFB2'
+  return '#00FFB2'
+}
+
+const getRoleLabel = (role: string) => {
+  if (role === 'ADMIN') return 'Administrator'
+  if (role === 'MANAGER') return 'Manager'
+  if (role === 'EMPLOYEE') return 'Employee'
+  return 'Customer'
+}
 
 export default function Sidebar() {
   const loc = useLocation()
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { user } = useSelector((s: any) => s.auth)
+  const navItems = getNavItems(user?.role || 'USER')
+  const roleColor = getRoleColor(user?.role || 'USER')
+  const roleLabel = getRoleLabel(user?.role || 'USER')
+
   const handleLogout = () => { dispatch(logout()); navigate('/login') }
 
   return (
@@ -37,9 +80,9 @@ export default function Sidebar() {
       </div>
 
       <div style={{ padding: '10px 24px', borderBottom: '1px solid rgba(245,200,66,0.06)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#00FFB2', display: 'inline-block', boxShadow: '0 0 8px #00FFB2' }} />
-        <span style={{ fontSize: '9px', color: '#7A8FA6', letterSpacing: '2px' }}>SYSTEM</span>
-        <span style={{ fontSize: '9px', color: '#00FFB2', letterSpacing: '2px' }}>ONLINE</span>
+        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: roleColor, display: 'inline-block', boxShadow: `0 0 8px ${roleColor}` }} />
+        <span style={{ fontSize: '9px', color: '#7A8FA6', letterSpacing: '2px' }}>ROLE</span>
+        <span style={{ fontSize: '9px', color: roleColor, letterSpacing: '2px' }}>{user?.role || 'USER'}</span>
       </div>
 
       <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
@@ -67,7 +110,7 @@ export default function Sidebar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
           <div style={{
             width: '42px', height: '42px', borderRadius: '12px',
-            background: 'linear-gradient(135deg, #F5C842, #D4A017)',
+            background: `linear-gradient(135deg, ${roleColor}, ${roleColor}CC)`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '16px', fontWeight: '800', color: '#060A12', flexShrink: 0
           }}>{user?.email?.charAt(0).toUpperCase() || 'U'}</div>
@@ -75,7 +118,7 @@ export default function Sidebar() {
             <div style={{ fontSize: '14px', fontWeight: '700', color: '#F0EFEA', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {user?.name || user?.email?.split('@')[0] || 'User'}
             </div>
-            <div style={{ fontSize: '8px', color: '#00FFB2', letterSpacing: '2px', marginTop: '2px' }}>● AUTHENTICATED</div>
+            <div style={{ fontSize: '8px', color: roleColor, letterSpacing: '2px', marginTop: '2px' }}>● {roleLabel}</div>
           </div>
         </div>
         <button onClick={handleLogout}

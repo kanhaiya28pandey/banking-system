@@ -14,6 +14,10 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ProfilePage from './pages/ProfilePage'
 import NotificationSettingsPage from './pages/NotificationSettingsPage'
 import ScheduledTransfersPage from './pages/ScheduledTransfersPage'
+import AdminDashboard from './pages/AdminDashboard'
+import ManagerDashboard from './pages/ManagerDashboard'
+import EmployeeDashboard from './pages/EmployeeDashboard'
+import UserDashboard from './pages/UserDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -26,15 +30,24 @@ function App() {
           <Route path="/register"         element={<RegisterPage />} />
           <Route path="/register-account" element={<MultiStepRegistration />} />
           <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
+
+          {/* Role-Based Dashboards */}
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/admin-dashboard" element={<ProtectedRoute requiredRoles={['ADMIN']}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/manager-dashboard" element={<ProtectedRoute requiredRoles={['MANAGER']}><ManagerDashboard /></ProtectedRoute>} />
+          <Route path="/employee-dashboard" element={<ProtectedRoute requiredRoles={['EMPLOYEE']}><EmployeeDashboard /></ProtectedRoute>} />
+          <Route path="/user-dashboard" element={<ProtectedRoute requiredRoles={['USER']}><UserDashboard /></ProtectedRoute>} />
+
+          {/* Legacy routes - redirects to dashboard */}
           <Route path="/"            element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/accounts"    element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
           <Route path="/transactions" element={<ProtectedRoute><TransactionPage /></ProtectedRoute>} />
           <Route path="/atm"         element={<ProtectedRoute><AtmPage /></ProtectedRoute>} />
-          <Route path="/admin"       element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+          <Route path="/admin"       element={<ProtectedRoute adminOnly={true}><AdminPage /></ProtectedRoute>} />
           <Route path="/profile"     element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/settings/notifications" element={<ProtectedRoute><NotificationSettingsPage /></ProtectedRoute>} />
           <Route path="/scheduled-transfers" element={<ProtectedRoute><ScheduledTransfersPage /></ProtectedRoute>} />
-          <Route path="*"            element={<Navigate to="/login" replace />} />
+          <Route path="*"            element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </Provider>

@@ -32,7 +32,17 @@ export default function LoginPage() {
         console.log('User ID:', user.id, 'Length:', user.id?.length)
         dispatch(setCredentials({ user, token }))
         toast.success('Access granted!')
-        navigate('/')
+
+        // Redirect based on role
+        if (user.role === 'ADMIN') {
+          navigate('/admin-dashboard')
+        } else if (user.role === 'MANAGER') {
+          navigate('/manager-dashboard')
+        } else if (user.role === 'EMPLOYEE') {
+          navigate('/employee-dashboard')
+        } else {
+          navigate('/user-dashboard')
+        }
       } else {
         toast.error(res.data.message)
       }
