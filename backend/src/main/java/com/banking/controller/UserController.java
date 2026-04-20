@@ -63,6 +63,21 @@ public class UserController {
             new ApiResponse<>(true, "Users fetched", userService.getAllUsers()));
     }
 
+    // Get users based on requester's role
+    @GetMapping("/by-role")
+    public ResponseEntity<ApiResponse<List<User>>> getUsersByRole(
+            @RequestParam String requesterId,
+            @RequestParam String requesterRole) {
+        try {
+            List<User> users = userService.getUsersByRole(requesterId, requesterRole);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Users fetched", users));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
     @PutMapping("/update/{id}")
     public ResponseEntity<ApiResponse<User>> updateUser(
             @PathVariable String id, @RequestBody User updatedUser) {
@@ -78,25 +93,98 @@ public class UserController {
 
     @PutMapping("/block/{id}")
     public ResponseEntity<ApiResponse<String>> blockUser(
-            @PathVariable String id) {
-        return userRepository.findById(id).map(user -> {
+            @PathVariable String id,
+            @RequestParam(required = false) String adminRole) {
+        try {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (!"ADMIN".equals(adminRole) && !"MANAGER".equals(adminRole)) {
+                return ResponseEntity.ok(
+                    new ApiResponse<>(false, "Only Admin/Manager can block users", null));
+            }
+
             user.setStatus("BLOCKED");
             userRepository.save(user);
             return ResponseEntity.ok(
-                new ApiResponse<>(true, "User blocked", (String) null));
-        }).orElse(ResponseEntity.ok(
-            new ApiResponse<>(false, "User not found", null)));
+                new ApiResponse<>(true, "User blocked", null));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
     }
 
     @PutMapping("/unblock/{id}")
     public ResponseEntity<ApiResponse<String>> unblockUser(
-            @PathVariable String id) {
-        return userRepository.findById(id).map(user -> {
+            @PathVariable String id,
+            @RequestParam(required = false) String adminRole) {
+        try {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (!"ADMIN".equals(adminRole)) {
+                return ResponseEntity.ok(
+                    new ApiResponse<>(false, "Only Admin can unblock users", null));
+            }
+
             user.setStatus("ACTIVE");
             userRepository.save(user);
             return ResponseEntity.ok(
-                new ApiResponse<>(true, "User unblocked", (String) null));
-        }).orElse(ResponseEntity.ok(
-            new ApiResponse<>(false, "User not found", null)));
+                new ApiResponse<>(true, "User unblocked", null));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Delete user (only Admin - soft delete)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<String>> deleteUser(
+            @PathVariable String id,
+            @RequestParam String deleterRole) {
+        try {
+            userService.softDeleteUser(id, deleterRole);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "User deleted", (String) null));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Create Manager (Admin only)
+    @PostMapping("/create-manager")
+    public ResponseEntity<ApiResponse<User>> createManager(
+            @RequestParam String creatorId,
+            @RequestBody User managerData) {
+        try {
+            User creator = userRepository.findById(creatorId)
+                    .orElseThrow(() -> new RuntimeException("Creator not found"));
+
+            User newManager = userService.createManager(creatorId, creator.getRole(), managerData);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Manager created successfully", newManager));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Create Employee (Manager only)
+    @PostMapping("/create-employee")
+    public ResponseEntity<ApiResponse<User>> createEmployee(
+            @RequestParam String creatorId,
+            @RequestBody User employeeData) {
+        try {
+            User creator = userRepository.findById(creatorId)
+                    .orElseThrow(() -> new RuntimeException("Creator not found"));
+
+            User newEmployee = userService.createEmployee(creatorId, creator.getRole(), employeeData);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Employee created successfully", newEmployee));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
     }
 }
