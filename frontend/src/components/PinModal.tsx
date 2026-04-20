@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface PinModalProps {
   isOpen: boolean
@@ -10,51 +10,48 @@ interface PinModalProps {
 
 export default function PinModal({ isOpen, onClose, onConfirm, title = 'TRANSACTION PIN REQUIRED', description = 'Enter your 4-digit PIN to confirm' }: PinModalProps) {
   const [pin, setPin] = useState('')
+  const keydownHandlerRef = useRef<((e: KeyboardEvent) => void) | null>(null)
 
-  // Keyboard support
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      if (keydownHandlerRef.current) {
+        window.removeEventListener('keydown', keydownHandlerRef.current)
+        keydownHandlerRef.current = null
+      }
+      return
+    }
 
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key >= '0' && e.key <= '9') {
         e.preventDefault()
-        handlePinKey(e.key)
+        setPin(prev => prev.length < 4 ? prev + e.key : prev)
       } else if (e.key === 'Backspace') {
         e.preventDefault()
-        handleClear()
+        setPin(prev => prev.slice(0, -1))
       } else if (e.key === 'Enter') {
         e.preventDefault()
-        if (pin.length === 4) handleConfirm()
+        if (pin.length === 4) onConfirm(pin)
       } else if (e.key === 'Escape') {
         e.preventDefault()
         onClose()
       }
     }
 
+    keydownHandlerRef.current = handleKeyPress
     window.addEventListener('keydown', handleKeyPress)
-    return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [isOpen, pin])
-
-  const handlePinKey = (digit: string) => {
-    if (pin.length < 4) setPin(p => p + digit)
-  }
-
-  const handleClear = () => {
-    setPin('')
-  }
-
-  const handleConfirm = () => {
-    if (pin.length === 4) {
-      onConfirm(pin)
-      setPin('')
+    return () => {
+      if (keydownHandlerRef.current) {
+        window.removeEventListener('keydown', handleKeyPress)
+        keydownHandlerRef.current = null
+      }
     }
-  }
+  }, [isOpen, pin, onConfirm, onClose])
 
   if (!isOpen) return null
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-      <div style={{ background: 'linear-gradient(160deg, #0D1829, #080E1A)', border: '2px solid rgba(245,200,66,0.3)', borderRadius: '24px', padding: '32px', maxWidth: '100%', width: '100%', maxWidth: '420px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}>
+      <div style={{ background: 'linear-gradient(160deg, #0D1829, #080E1A)', border: '2px solid rgba(245,200,66,0.3)', borderRadius: '24px', padding: '32px', width: '100%', maxWidth: '420px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}>
         {/* Title */}
         <div style={{ fontSize: '14px', color: '#F5C842', fontWeight: '700', marginBottom: '8px', letterSpacing: '2px' }}>{title}</div>
         <div style={{ fontSize: '12px', color: '#4A6080', marginBottom: '24px' }}>{description}</div>
@@ -69,7 +66,9 @@ export default function PinModal({ isOpen, onClose, onConfirm, title = 'TRANSACT
           {['1','2','3','4','5','6','7','8','9','','0',''].map((k, i) => (
             <button
               key={i}
-              onClick={() => k && handlePinKey(k)}
+              onClick={() => {
+                if (k) setPin(prev => prev.length < 4 ? prev + k : prev)
+              }}
               disabled={k === ''}
               style={{
                 background: k === '' ? 'transparent' : 'rgba(245,200,66,0.1)',
@@ -82,7 +81,6 @@ export default function PinModal({ isOpen, onClose, onConfirm, title = 'TRANSACT
                 cursor: k === '' ? 'default' : 'pointer',
                 opacity: k === '' ? 0 : 1,
                 transition: 'all 0.2s',
-                ':active': { transform: 'scale(0.95)' }
               }}
             >
               {k}
@@ -115,7 +113,7 @@ export default function PinModal({ isOpen, onClose, onConfirm, title = 'TRANSACT
             CANCEL
           </button>
           <button
-            onClick={handleClear}
+            onClick={() => setPin('')}
             style={{
               background: 'rgba(255,77,109,0.1)',
               border: '1px solid rgba(255,77,109,0.3)',
@@ -135,7 +133,12 @@ export default function PinModal({ isOpen, onClose, onConfirm, title = 'TRANSACT
 
         {/* Confirm Button - Full Width & Responsive */}
         <button
-          onClick={handleConfirm}
+          onClick={() => {
+            if (pin.length === 4) {
+              onConfirm(pin)
+              setPin('')
+            }
+          }}
           disabled={pin.length !== 4}
           style={{
             width: '100%',

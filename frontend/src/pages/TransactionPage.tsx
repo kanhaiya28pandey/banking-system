@@ -11,7 +11,7 @@ import { downloadReceipt, searchTransactions } from '../api/transactionApi'
 type Tab = 'deposit' | 'withdraw' | 'transfer' | 'history'
 
 export default function TransactionPage() {
-  const { user, token } = useSelector((s: any) => s.auth)
+  const { user } = useSelector((s: any) => s.auth)
   const [tab, setTab] = useState<Tab>('deposit')
   const [amount, setAmount] = useState('')
   const [fromAcc, setFrom] = useState('')
@@ -28,25 +28,38 @@ export default function TransactionPage() {
   const [hasTransactionPin, setHasTransactionPin] = useState(false)
   const [showPinModal, setShowPinModal] = useState(false)
   const [pendingTransaction, setPendingTransaction] = useState<{ type: 'deposit' | 'withdraw' | 'transfer', amount: number } | null>(null)
-  const headers = { headers: { Authorization: `Bearer ${token}` } }
 
   useEffect(() => {
     if (!user?.id) return
-    api.get(`/account/user/${user.id}`, headers).then(res => {
-      const accs = res.data.data || []
-      setAccounts(accs)
-      if (accs.length > 0) { setSelectedAcc(accs[0].accountNumber); setFrom(accs[0].accountNumber) }
-    }).catch(() => {})
 
-    // Check if user has transaction PIN set
-    setHasTransactionPin(!!(user?.transactionPin && user.transactionPin.length > 0))
-  }, [user])
+    const loadData = async () => {
+      try {
+        const res = await api.get(`/account/user/${user.id}`)
+        const accs = res.data.data || []
+        setAccounts(accs)
+        if (accs.length > 0) {
+          setSelectedAcc(accs[0].accountNumber)
+          setFrom(accs[0].accountNumber)
+        }
+      } catch {}
+
+      // Check if user has transaction PIN set
+      try {
+        const pinRes = await api.get(`/user/has-transaction-pin/${user.id}`)
+        setHasTransactionPin(pinRes.data.data === true)
+      } catch {
+        setHasTransactionPin(false)
+      }
+    }
+
+    loadData()
+  }, [user?.id])
 
   const fetchHistory = async (accNum: string) => {
     if (!accNum) return
     setHistLoading(true)
     try {
-      const res = await api.get(`/transaction/history/${accNum}`, headers)
+      const res = await api.get(`/transaction/history/${accNum}`)
       setHistory(res.data.data || [])
     } catch { toast.error('Failed to load history') }
     setHistLoading(false)
@@ -55,7 +68,7 @@ export default function TransactionPage() {
   useEffect(() => { if (tab === 'history' && selectedAcc) fetchHistory(selectedAcc) }, [tab, selectedAcc])
 
   const refreshAccounts = async () => {
-    const res = await api.get(`/account/user/${user.id}`, headers)
+    const res = await api.get(`/account/user/${user.id}`)
     setAccounts(res.data.data || [])
   }
 
@@ -93,13 +106,24 @@ export default function TransactionPage() {
 
     setLoading(true)
     try {
-      const endpoint = hasTransactionPin ? '/transaction/deposit-with-pin' : `/transaction/deposit?accountNumber=${selectedAcc}&amount=${amount}`
-      const method = hasTransactionPin ? 'post' : 'post'
-      const data = hasTransactionPin ? { accountNumber: selectedAcc, amount: parseFloat(amount), transactionPin: pin } : {}
-
-      await api[method](endpoint, data, headers)
-      toast.success(`₹${amount} deposited!`); setAmount(''); refreshAccounts()
-    } catch (err: any) { toast.error(err.response?.data?.message || 'Deposit failed') }
+      if (pin && hasTransactionPin) {
+        // PIN endpoint uses request body
+        await api.post('/transaction/deposit-with-pin', {
+          accountNumber: selectedAcc,
+          amount: parseFloat(amount),
+          transactionPin: pin
+        })
+      } else {
+        // Regular endpoint uses query parameters
+        await api.post(`/transaction/deposit?accountNumber=${selectedAcc}&amount=${amount}`, {})
+      }
+      toast.success(`₹${amount} deposited!`)
+      setAmount('')
+      refreshAccounts()
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || 'Deposit failed'
+      toast.error(errMsg)
+    }
     setLoading(false)
   }
 
@@ -114,12 +138,24 @@ export default function TransactionPage() {
 
     setLoading(true)
     try {
-      const endpoint = hasTransactionPin ? '/transaction/withdraw-with-pin' : `/transaction/withdraw?accountNumber=${selectedAcc}&amount=${amount}`
-      const data = hasTransactionPin ? { accountNumber: selectedAcc, amount: parseFloat(amount), transactionPin: pin } : {}
-
-      await api.post(endpoint, data, headers)
-      toast.success(`₹${amount} withdrawn!`); setAmount(''); refreshAccounts()
-    } catch (err: any) { toast.error(err.response?.data?.message || 'Insufficient balance') }
+      if (pin && hasTransactionPin) {
+        // PIN endpoint uses request body
+        await api.post('/transaction/withdraw-with-pin', {
+          accountNumber: selectedAcc,
+          amount: parseFloat(amount),
+          transactionPin: pin
+        })
+      } else {
+        // Regular endpoint uses query parameters
+        await api.post(`/transaction/withdraw?accountNumber=${selectedAcc}&amount=${amount}`, {})
+      }
+      toast.success(`₹${amount} withdrawn!`)
+      setAmount('')
+      refreshAccounts()
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || 'Withdrawal failed'
+      toast.error(errMsg)
+    }
     setLoading(false)
   }
 
@@ -135,12 +171,32 @@ export default function TransactionPage() {
 
     setLoading(true)
     try {
-      const endpoint = hasTransactionPin ? '/transaction/transfer-with-pin' : '/transaction/transfer'
-      const data = { fromAccount: fromAcc, toAccount: toAcc, amount: parseFloat(amount), description: 'Transfer', ...(hasTransactionPin && { transactionPin: pin }) }
-
-      await api.post(endpoint, data, headers)
-      toast.success(`₹${amount} transferred!`); setAmount(''); setTo(''); refreshAccounts()
-    } catch (err: any) { toast.error(err.response?.data?.message || 'Transfer failed') }
+      if (pin && hasTransactionPin) {
+        // PIN endpoint uses request body
+        await api.post('/transaction/transfer-with-pin', {
+          fromAccount: fromAcc,
+          toAccount: toAcc,
+          amount: parseFloat(amount),
+          description: 'Transfer',
+          transactionPin: pin
+        })
+      } else {
+        // Regular endpoint uses request body
+        await api.post('/transaction/transfer', {
+          fromAccount: fromAcc,
+          toAccount: toAcc,
+          amount: parseFloat(amount),
+          description: 'Transfer'
+        })
+      }
+      toast.success(`₹${amount} transferred!`)
+      setAmount('')
+      setTo('')
+      refreshAccounts()
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || 'Transfer failed'
+      toast.error(errMsg)
+    }
     setLoading(false)
   }
 
@@ -267,7 +323,7 @@ export default function TransactionPage() {
                   </div>
                 </div>
 
-                <button disabled={loading} onClick={tab === 'deposit' ? handleDeposit : tab === 'withdraw' ? handleWithdraw : handleTransfer} style={{ width: '100%', border: 'none', borderRadius: '14px', padding: '17px', fontSize: '12px', fontWeight: '700', letterSpacing: '2px', cursor: loading ? 'not-allowed' : 'pointer', background: `linear-gradient(135deg, ${activeTab.color}, ${activeTab.color}BB)`, color: tab === 'withdraw' || tab === 'transfer' ? 'white' : '#060A12', boxShadow: `0 8px 28px ${activeTab.color}40`, opacity: loading ? 0.7 : 1 }}>
+                <button disabled={loading} onClick={() => tab === 'deposit' ? handleDeposit() : tab === 'withdraw' ? handleWithdraw() : handleTransfer()} style={{ width: '100%', border: 'none', borderRadius: '14px', padding: '17px', fontSize: '12px', fontWeight: '700', letterSpacing: '2px', cursor: loading ? 'not-allowed' : 'pointer', background: `linear-gradient(135deg, ${activeTab.color}, ${activeTab.color}BB)`, color: tab === 'withdraw' || tab === 'transfer' ? 'white' : '#060A12', boxShadow: `0 8px 28px ${activeTab.color}40`, opacity: loading ? 0.7 : 1 }}>
                   {loading ? 'PROCESSING...' : `EXECUTE ${tab.toUpperCase()} →`}
                 </button>
               </div>

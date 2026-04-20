@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { useSelector } from 'react-redux'
 import Sidebar from '../components/Sidebar'
 import PinModal from '../components/PinModal'
@@ -7,7 +7,7 @@ import api from '../api/axiosInstance'
 import { downloadReceipt } from '../api/transactionApi'
 
 export default function AtmPage() {
-  const { user, token } = useSelector((s: any) => s.auth)
+  const { user } = useSelector((s: any) => s.auth)
   const [input, setInput] = useState('')
   const [balance, setBalance] = useState(0)
   const [accounts, setAccounts] = useState<any[]>([])
@@ -17,25 +17,38 @@ export default function AtmPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [hasTransactionPin, setHasTransactionPin] = useState(false)
   const [showPinModal, setShowPinModal] = useState(false)
-  const [pendingTransaction, setPendingTransaction] = useState<{ type: 'withdraw' | 'deposit', amount: number } | null>(null)
-  const headers = { headers: { Authorization: `Bearer ${token}` } }
+  const [pendingTransaction, setPendingTransaction] = useState<{ type: 'withdraw' | 'transfer', amount: number } | null>(null)
+  const [showQuickTransfer, setShowQuickTransfer] = useState(false)
+
+  const quickTransferAmounts = [5000, 10000, 25000, 50000, 100000]
 
   useEffect(() => {
     if (!user?.id) return
-    api.get(`/account/user/${user.id}`, headers)
-      .then(res => {
+
+    const loadData = async () => {
+      try {
+        const res = await api.get(`/account/user/${user.id}`)
         const accs = res.data.data || []
         setAccounts(accs)
         if (accs.length > 0) {
           setSelectedAccount(accs[0].accountNumber)
           setBalance(accs[0].balance || 0)
         }
-      })
-      .catch(() => addLog('> ERROR: FAILED TO LOAD ACCOUNTS'))
+      } catch {
+        addLog('> ERROR: FAILED TO LOAD ACCOUNTS')
+      }
 
-    // Check if user has transaction PIN set
-    setHasTransactionPin(!!(user?.transactionPin && user.transactionPin.length > 0))
-  }, [user, token])
+      // Check if user has transaction PIN set
+      try {
+        const pinRes = await api.get(`/user/has-transaction-pin/${user.id}`)
+        setHasTransactionPin(pinRes.data.data === true)
+      } catch {
+        setHasTransactionPin(false)
+      }
+    }
+
+    loadData()
+  }, [user?.id])
 
   // Keyboard support
   useEffect(() => {
@@ -72,16 +85,21 @@ export default function AtmPage() {
   const atmKey = (v: string) => setInput(p => p + v)
   const atmClear = () => { setInput('') }
 
-  const processPendingTransaction = async (pin: string) => {
+  const handleClosePinModal = useCallback(() => {
+    setShowPinModal(false)
+    setPendingTransaction(null)
+  }, [])
+
+  const processPendingTransaction = useCallback(async (pin: string) => {
     if (!pendingTransaction) return
 
     try {
-      const endpoint = pendingTransaction.type === 'withdraw' ? '/transaction/withdraw-with-pin' : '/transaction/deposit-with-pin'
-      const res = await api.post(endpoint, {
-        accountNumber: selectedAccount,
-        amount: pendingTransaction.amount,
-        transactionPin: pin
-      }, headers)
+      const endpoint = pendingTransaction.type === 'withdraw' ? '/transaction/withdraw-with-pin' : '/transaction/transfer-with-pin'
+      const body = pendingTransaction.type === 'withdraw'
+        ? { accountNumber: selectedAccount, amount: pendingTransaction.amount, transactionPin: pin }
+        : { fromAccount: selectedAccount, toAccount: selectedAccount, amount: pendingTransaction.amount, description: 'Quick Transfer', transactionPin: pin }
+
+      const res = await api.post(endpoint, body)
 
       if (res.data.success) {
         const newBalance = pendingTransaction.type === 'withdraw'
@@ -89,7 +107,7 @@ export default function AtmPage() {
           : balance + pendingTransaction.amount
         setBalance(newBalance)
         addLog(`> PIN VERIFIED ✓`)
-        addLog(`> ${pendingTransaction.type.toUpperCase()}: ₹${pendingTransaction.amount.toLocaleString('en-IN')}`)
+        addLog(`> ${pendingTransaction.type === 'withdraw' ? 'DISPENSING' : 'QUICK TRANSFER'}: ₹${pendingTransaction.amount.toLocaleString('en-IN')}`)
         addLog(`> NEW BALANCE: ₹${newBalance.toLocaleString('en-IN')}`)
         addLog('> PRINT RECEIPT? (Check bottom)')
         setLastTransactionId(res.data.data.transactionId)
@@ -103,9 +121,10 @@ export default function AtmPage() {
       toast.error('Transaction failed: ' + (err.response?.data?.message || 'Invalid PIN'))
     }
 
+    setShowPinModal(false)
     setPendingTransaction(null)
     setInput('')
-  }
+  }, [pendingTransaction, selectedAccount, balance])
 
   const withdraw = async () => {
     const amt = parseInt(input)
@@ -125,7 +144,7 @@ export default function AtmPage() {
     } else {
       // Process directly without PIN
       try {
-        const res = await api.post(`/transaction/withdraw?accountNumber=${selectedAccount}&amount=${amt}`, {}, headers)
+        const res = await api.post(`/transaction/withdraw?accountNumber=${selectedAccount}&amount=${amt}`, {})
         if (res.data.success) {
           const nb = balance - amt
           setBalance(nb)
@@ -143,6 +162,41 @@ export default function AtmPage() {
         toast.error('Withdrawal failed')
       }
       setInput('')
+    }
+  }
+
+  const deposit = async () => {
+    const amt = parseInt(input)
+    if (!amt || amt <= 0) { toast.error('Enter valid amount'); return }
+    if (!selectedAccount) { toast.error('Select account'); return }
+
+    if (hasTransactionPin) {
+      // Show PIN entry modal
+      addLog('> TRANSACTION PIN REQUIRED')
+      setPendingTransaction({ type: 'transfer', amount: amt })
+      setShowPinModal(true)
+    } else {
+      // Process directly without PIN
+      try {
+        const res = await api.post(`/transaction/transfer?fromAccount=${selectedAccount}&toAccount=${selectedAccount}&amount=${amt}`, {})
+        if (res.data.success) {
+          const nb = balance + amt
+          setBalance(nb)
+          addLog(`> QUICK TRANSFER: ₹${amt.toLocaleString('en-IN')}`)
+          addLog(`> NEW BALANCE: ₹${nb.toLocaleString('en-IN')}`)
+          addLog('> PRINT RECEIPT? (Check bottom)')
+          setLastTransactionId(res.data.data.transactionId)
+          toast.success(`₹${amt.toLocaleString('en-IN')} transferred!`)
+        } else {
+          addLog('> ERROR: ' + res.data.message)
+          toast.error(res.data.message)
+        }
+      } catch (err: any) {
+        addLog('> ERROR: TRANSACTION FAILED')
+        toast.error('Transfer failed')
+      }
+      setInput('')
+      setShowQuickTransfer(false)
     }
   }
 
@@ -229,9 +283,10 @@ export default function AtmPage() {
               ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-              <button onClick={withdraw} style={{ background: 'linear-gradient(135deg, #F5C842, #D4A017)', color: '#060A12', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1px' }}>WITHDRAW</button>
-              <button onClick={() => { addLog(`> BALANCE: ₹${balance.toLocaleString('en-IN')}`); toast.success(`Balance: ₹${balance.toLocaleString('en-IN')}`) }} style={{ background: 'linear-gradient(135deg, #00FFB2, #00C48A)', color: '#060A12', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1px' }}>BALANCE</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+              <button onClick={withdraw} style={{ background: 'linear-gradient(135deg, #FF4D6D, #E63459)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1px' }}>↑ WITHDRAW</button>
+              <button onClick={() => setShowQuickTransfer(true)} style={{ width: '100%', background: 'linear-gradient(135deg, #3B9EFF, #2E7FCC)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1px' }}>⇄ QUICK TRANSFER</button>
+              <button onClick={() => { addLog(`> BALANCE: ₹${balance.toLocaleString('en-IN')}`); toast.success(`Balance: ₹${balance.toLocaleString('en-IN')}`) }} style={{ background: 'linear-gradient(135deg, #F5C842, #D4A017)', color: '#060A12', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1px' }}>BALANCE</button>
             </div>
 
             {/* Receipt Buttons */}
@@ -271,11 +326,73 @@ export default function AtmPage() {
 
       <PinModal
         isOpen={showPinModal}
-        onClose={() => { setShowPinModal(false); setPendingTransaction(null) }}
+        onClose={handleClosePinModal}
         onConfirm={processPendingTransaction}
         title="ATM TRANSACTION PIN"
         description="Enter your 4-digit PIN to complete the transaction"
       />
+
+      {showQuickTransfer && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001, padding: '16px' }}>
+          <div style={{ background: 'linear-gradient(160deg, #0D1829, #080E1A)', border: '2px solid rgba(59,158,255,0.3)', borderRadius: '24px', padding: '32px', width: '100%', maxWidth: '420px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}>
+            <div style={{ fontSize: '14px', color: '#3B9EFF', fontWeight: '700', marginBottom: '8px', letterSpacing: '2px' }}>QUICK TRANSFER</div>
+            <div style={{ fontSize: '12px', color: '#4A6080', marginBottom: '24px' }}>Select amount to transfer</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '20px' }}>
+              {quickTransferAmounts.map(amt => (
+                <button
+                  key={amt}
+                  onClick={() => {
+                    setInput(amt.toString())
+                    deposit()
+                    setShowQuickTransfer(false)
+                  }}
+                  style={{
+                    background: 'rgba(59,158,255,0.1)',
+                    border: '1px solid rgba(59,158,255,0.3)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    color: '#3B9EFF',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    letterSpacing: '1px'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(59,158,255,0.2)'
+                    e.currentTarget.style.boxShadow = '0 0 15px rgba(59,158,255,0.3)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(59,158,255,0.1)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  ₹{amt.toLocaleString('en-IN')}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowQuickTransfer(false)}
+              style={{
+                width: '100%',
+                background: 'rgba(255,77,109,0.1)',
+                border: '1px solid rgba(255,77,109,0.3)',
+                color: '#FF4D6D',
+                borderRadius: '10px',
+                padding: '12px',
+                fontSize: '11px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                letterSpacing: '2px'
+              }}
+            >
+              CANCEL
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

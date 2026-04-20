@@ -23,11 +23,25 @@ public class UserController {
         return userRepository.findByEmail(email)
                 .map(u -> {
                     u.setPassword(null);
+                    u.setTransactionPin(null);
                     return ResponseEntity.ok(
                         new ApiResponse<>(true, "User found", u));
                 })
                 .orElse(ResponseEntity.ok(
                     new ApiResponse<>(false, "User not found", null)));
+    }
+
+    @GetMapping("/has-transaction-pin/{id}")
+    public ResponseEntity<ApiResponse<Boolean>> hasTransactionPin(
+            @PathVariable String id) {
+        return userRepository.findById(id)
+                .map(u -> {
+                    boolean hasPin = u.getTransactionPin() != null && !u.getTransactionPin().isEmpty();
+                    return ResponseEntity.ok(
+                        new ApiResponse<>(true, "PIN status", hasPin));
+                })
+                .orElse(ResponseEntity.ok(
+                    new ApiResponse<>(false, "User not found", false)));
     }
 
     @GetMapping("/{id}")

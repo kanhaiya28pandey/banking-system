@@ -4,6 +4,7 @@ import com.banking.model.User;
 import com.banking.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
@@ -25,15 +26,23 @@ public class UserService {
         return user;
     }
 
+    @Transactional
     public User updateUser(String id, User updatedUser) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
         if (updatedUser.getName() != null)
             user.setName(updatedUser.getName());
         if (updatedUser.getPhone() != null)
             user.setPhone(updatedUser.getPhone());
-        userRepository.save(user);
-        user.setPassword(null);
-        return user;
+        if (updatedUser.getTransactionPin() != null)
+            user.setTransactionPin(updatedUser.getTransactionPin());
+
+        User saved = userRepository.save(user);
+
+        // Don't send sensitive data back
+        saved.setPassword(null);
+        saved.setTransactionPin(null);
+        return saved;
     }
 }

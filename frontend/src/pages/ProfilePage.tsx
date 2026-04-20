@@ -16,31 +16,42 @@ export default function ProfilePage() {
   const [pwdLoading, setPwdLoading] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [tab, setTab] = useState<'info'|'security'|'kyc'>('info')
+  const [tab, setTab] = useState<'info'|'security'|'kyc'|'pin'>('info')
   const [accounts, setAccounts] = useState<any[]>([])
-  const headers = { headers: { Authorization: `Bearer ${token}` } }
+  const [pin, setPin] = useState({ newPin: '', confirmPin: '' })
+  const [pinLoading, setPinLoading] = useState(false)
+  const [hasPin, setHasPin] = useState(false)
+  const [showNewPin, setShowNewPin] = useState(false)
+  const [showConfirmPin, setShowConfirmPin] = useState(false)
 
   useEffect(() => { if (user) setForm({ name: user.name||'', phone: user.phone||'' }) }, [user])
 
   useEffect(() => {
     if (user?.id) {
-      const fetchAccounts = async () => {
+      const fetchData = async () => {
         try {
-          const res = await api.get(`/account/user/${user.id}`, headers)
+          const res = await api.get(`/account/user/${user.id}`)
           setAccounts(res.data.data || [])
         } catch (err) {
           console.error('Failed to load accounts:', err)
         }
+
+        try {
+          const pinRes = await api.get(`/user/has-transaction-pin/${user.id}`)
+          setHasPin(pinRes.data.data === true)
+        } catch {
+          setHasPin(false)
+        }
       }
-      fetchAccounts()
+      fetchData()
     }
-  }, [user?.id, token])
+  }, [user?.id])
 
   const handleUpdate = async () => {
     if (!form.name||!form.phone) { toast.error('Fill all fields'); return }
     setLoading(true)
     try {
-      const res = await api.put(`/user/update/${user.id}`, { name: form.name, phone: form.phone }, headers)
+      const res = await api.put(`/user/update/${user.id}`, { name: form.name, phone: form.phone })
       if (res.data.success) { dispatch(setCredentials({ user: { ...user, ...res.data.data }, token })); toast.success('Profile updated!') }
       else toast.error(res.data.message)
     } catch { toast.error('Failed') }
@@ -53,11 +64,27 @@ export default function ProfilePage() {
     if (pwd.newPassword.length < 6) { toast.error('Min 6 characters'); return }
     setPwdLoading(true)
     try {
-      const res = await api.post(`/auth/reset-password?email=${user.email}&newPassword=${pwd.newPassword}`, {}, headers)
+      const res = await api.post(`/auth/reset-password?email=${user.email}&newPassword=${pwd.newPassword}`, {})
       if (res.data.success) { toast.success('Password changed! Login again.'); setTimeout(() => navigate('/login'), 2000) }
       else toast.error(res.data.message)
     } catch { toast.error('Failed') }
     setPwdLoading(false)
+  }
+
+  const handleChangePin = async () => {
+    if (!pin.newPin||!pin.confirmPin) { toast.error('Fill all fields'); return }
+    if (pin.newPin !== pin.confirmPin) { toast.error('PINs do not match'); return }
+    if (pin.newPin.length !== 4 || !/^\d+$/.test(pin.newPin)) { toast.error('PIN must be 4 digits'); return }
+    setPinLoading(true)
+    try {
+      const res = await api.put(`/user/update/${user.id}`, { transactionPin: pin.newPin })
+      if (res.data.success) {
+        setHasPin(true)
+        setPin({ newPin: '', confirmPin: '' })
+        toast.success('Transaction PIN set successfully!')
+      } else toast.error(res.data.message)
+    } catch { toast.error('Failed to update PIN') }
+    setPinLoading(false)
   }
 
   const inp: any = { width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '14px 18px', color: '#F0EFEA', fontSize: '15px', outline: 'none', boxSizing: 'border-box' }
@@ -95,9 +122,9 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <div style={{ display: 'flex', gap: '4px', background: 'rgba(10,18,32,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '5px', marginBottom: '24px', width: 'fit-content' }}>
-              {[{ key: 'info' as const, label: '👤 Profile Info' }, { key: 'kyc' as const, label: '🆔 KYC Info' }, { key: 'security' as const, label: '🔐 Change Password' }].map(t => (
-                <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '11px 24px', borderRadius: '10px', border: 'none', background: tab === t.key ? 'linear-gradient(135deg, #F5C842, #D4A017)' : 'transparent', color: tab === t.key ? '#060A12' : '#7A8FA6', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>{t.label}</button>
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(10,18,32,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '5px', marginBottom: '24px', width: 'fit-content', overflowX: 'auto' }}>
+              {[{ key: 'info' as const, label: '👤 Profile Info' }, { key: 'security' as const, label: '🔐 Password' }, { key: 'pin' as const, label: '🔑 Transaction PIN' }, { key: 'kyc' as const, label: '🆔 KYC Info' }].map(t => (
+                <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '11px 20px', borderRadius: '10px', border: 'none', background: tab === t.key ? 'linear-gradient(135deg, #F5C842, #D4A017)' : 'transparent', color: tab === t.key ? '#060A12' : '#7A8FA6', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>{t.label}</button>
               ))}
             </div>
 
@@ -141,6 +168,46 @@ export default function ProfilePage() {
                     {pwd.confirmPassword && <div style={{ marginTop: '8px', fontSize: '12px', color: pwd.newPassword===pwd.confirmPassword?'#00FFB2':'#FF4D6D' }}>{pwd.newPassword===pwd.confirmPassword?'✓ Match':'✗ No match'}</div>}
                   </div>
                   <button onClick={handleChangePwd} disabled={pwdLoading} style={{ background: 'linear-gradient(135deg, #F5C842, #D4A017)', color: '#060A12', border: 'none', borderRadius: '12px', padding: '16px 40px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', letterSpacing: '1.5px', opacity: pwdLoading?0.7:1 }}>{pwdLoading?'CHANGING...':'CHANGE PASSWORD →'}</button>
+                </>
+              )}
+              {tab === 'pin' && (
+                <>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#F5C842', marginBottom: '28px', letterSpacing: '2px' }}>TRANSACTION PIN SECURITY</div>
+
+                  <div style={{ background: 'rgba(59,158,255,0.08)', border: '1px solid rgba(59,158,255,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '20px' }}>🔐</span>
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#3B9EFF' }}>PIN Status</div>
+                        <div style={{ fontSize: '13px', color: '#4A6080', marginTop: '4px' }}>
+                          {hasPin ? '✓ You have a transaction PIN set' : '⚠ No transaction PIN set yet'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>NEW 4-DIGIT PIN</label>
+                    <div style={{ position: 'relative' }}>
+                      <input type={showNewPin?'text':'password'} maxLength={4} inputMode="numeric" style={{ ...inp, paddingRight: '52px', letterSpacing: '4px', fontSize: '18px', fontWeight: 'bold' }} value={pin.newPin} onChange={e => setPin({...pin, newPin: e.target.value.replace(/\D/g, '').slice(0, 4)})} placeholder="••••" />
+                      <button onClick={() => setShowNewPin(!showNewPin)} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: showNewPin?'#3B9EFF':'#4A6080', padding: 0 }}>{showNewPin?'🙈':'👁️'}</button>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '28px' }}>
+                    <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>CONFIRM PIN</label>
+                    <div style={{ position: 'relative' }}>
+                      <input type={showConfirmPin?'text':'password'} maxLength={4} inputMode="numeric" style={{ ...inp, paddingRight: '52px', letterSpacing: '4px', fontSize: '18px', fontWeight: 'bold' }} value={pin.confirmPin} onChange={e => setPin({...pin, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 4)})} placeholder="••••" />
+                      <button onClick={() => setShowConfirmPin(!showConfirmPin)} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: showConfirmPin?'#3B9EFF':'#4A6080', padding: 0 }}>{showConfirmPin?'🙈':'👁️'}</button>
+                    </div>
+                    {pin.confirmPin && <div style={{ marginTop: '8px', fontSize: '12px', color: pin.newPin===pin.confirmPin?'#00FFB2':'#FF4D6D' }}>{pin.newPin===pin.confirmPin?'✓ Match':'✗ No match'}</div>}
+                  </div>
+
+                  <div style={{ background: 'rgba(0,255,178,0.05)', border: '1px solid rgba(0,255,178,0.2)', borderRadius: '12px', padding: '12px', marginBottom: '24px', fontSize: '12px', color: '#00FFB2', lineHeight: '1.6' }}>
+                    ℹ️ Use this 4-digit PIN to verify sensitive transactions like quick transfers and withdrawals at ATM. Keep it secret and never share it with anyone.
+                  </div>
+
+                  <button onClick={handleChangePin} disabled={pinLoading || pin.newPin.length !== 4 || pin.confirmPin.length !== 4} style={{ background: pin.newPin.length === 4 && pin.confirmPin.length === 4 ? 'linear-gradient(135deg, #F5C842, #D4A017)' : 'rgba(245,200,66,0.3)', color: '#060A12', border: 'none', borderRadius: '12px', padding: '16px 40px', fontSize: '12px', fontWeight: '700', cursor: pin.newPin.length === 4 ? 'pointer' : 'not-allowed', letterSpacing: '1.5px', opacity: pinLoading?0.7:1 }}>{pinLoading?'SAVING...':hasPin?'UPDATE PIN →':'SET PIN →'}</button>
                 </>
               )}
               {tab === 'kyc' && (

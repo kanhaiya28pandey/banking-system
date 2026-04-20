@@ -160,7 +160,8 @@ public class TransactionService {
         if (storedPin == null || storedPin.isEmpty()) {
             throw new RuntimeException("No transaction PIN set. Please set a PIN first.");
         }
-        if (!storedPin.equals(providedPin)) {
+        // Trim whitespace and compare
+        if (!storedPin.trim().equals(providedPin != null ? providedPin.trim() : "")) {
             throw new RuntimeException("Invalid transaction PIN");
         }
     }
