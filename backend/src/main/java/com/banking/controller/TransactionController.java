@@ -67,6 +67,20 @@ public class TransactionController {
         }
     }
 
+    @PostMapping("/transfer")
+    public ResponseEntity<ApiResponse<TransactionResponse>> transfer(
+            @RequestBody TransactionRequest req) {
+        try {
+            Transaction tx = transactionService.transfer(req);
+            TransactionResponse response = TransactionResponse.fromTransaction(tx);
+            return ResponseEntity.ok(new ApiResponse<>(
+                true, "Transfer successful. Receipt link included.", response));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ApiResponse<>(
+                false, e.getMessage(), null));
+        }
+    }
+
     @PostMapping("/withdraw-with-pin")
     public ResponseEntity<ApiResponse<TransactionResponse>> withdrawWithPin(
             @RequestBody TransactionWithPinRequest req) {
