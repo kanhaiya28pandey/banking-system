@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface AccountRepository extends MongoRepository<Account, String> {
     Optional<Account> findByAccountNumber(String accountNumber);
     List<Account> findByUserId(String userId);
+    Optional<Account> findByUserIdAndAccountType(String userId, String accountType);
+    List<Account> findByUserIdAndAccountTypeAndStatus(String userId, String accountType, String status);
 }

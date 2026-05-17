@@ -484,16 +484,39 @@ export default function EmployeeDashboard() {
                           )}
 
                           <td style={{ padding: '12px', fontSize: '12px' }}>
-                            <span style={{
-                              background: acc.accountType?.toUpperCase() === 'SAVING' ? 'rgba(255,184,0,0.2)' : 'rgba(59,158,255,0.2)',
-                              color: acc.accountType?.toUpperCase() === 'SAVING' ? '#FFB800' : '#3B9EFF',
-                              padding: '4px 10px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: '700'
-                            }}>
-                              {acc.accountType?.toUpperCase() === 'SAVING' ? '🏦 SAVING' : '💼 CURRENT'}
-                            </span>
+                            {(() => {
+                              const type = acc.accountType?.toUpperCase() || 'CURRENT'
+                              let bgColor = 'rgba(59,158,255,0.2)'
+                              let textColor = '#3B9EFF'
+                              let icon = '💼'
+
+                              if (type === 'SAVING') {
+                                bgColor = 'rgba(255,184,0,0.2)'
+                                textColor = '#FFB800'
+                                icon = '🏦'
+                              } else if (type === 'FIXED_DEPOSIT') {
+                                bgColor = 'rgba(200,0,255,0.2)'
+                                textColor = '#C800FF'
+                                icon = '📦'
+                              } else if (type === 'SALARY') {
+                                bgColor = 'rgba(0,255,150,0.2)'
+                                textColor = '#00FF96'
+                                icon = '💰'
+                              }
+
+                              return (
+                                <span style={{
+                                  background: bgColor,
+                                  color: textColor,
+                                  padding: '4px 10px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: '700'
+                                }}>
+                                  {icon} {type}
+                                </span>
+                              )
+                            })()}
                           </td>
                           <td style={{ padding: '12px', fontSize: '12px', color: '#4A6080' }}>{acc.accountNumber}</td>
                           <td style={{ padding: '12px', fontSize: '12px', fontWeight: '700' }}>₹{acc.balance?.toLocaleString() || '0'}</td>
@@ -655,6 +678,7 @@ export default function EmployeeDashboard() {
                       <th style={{ textAlign: 'left', padding: '12px', color: '#4A6080', fontSize: '11px' }}>PHONE</th>
                       <th style={{ textAlign: 'left', padding: '12px', color: '#4A6080', fontSize: '11px' }}>ACCOUNT TYPE</th>
                       <th style={{ textAlign: 'left', padding: '12px', color: '#4A6080', fontSize: '11px' }}>DEPOSIT</th>
+                      <th style={{ textAlign: 'left', padding: '12px', color: '#4A6080', fontSize: '11px' }}>REQUESTED DATE</th>
                       <th style={{ textAlign: 'left', padding: '12px', color: '#4A6080', fontSize: '11px' }}>STATUS</th>
                       <th style={{ textAlign: 'left', padding: '12px', color: '#4A6080', fontSize: '11px' }}>ACTIONS</th>
                     </tr>
@@ -666,6 +690,9 @@ export default function EmployeeDashboard() {
                         <td style={{ padding: '12px', fontSize: '12px', color: '#4A6080' }}>{req.userPhone || 'N/A'}</td>
                         <td style={{ padding: '12px', fontSize: '12px' }}>{req.accountType}</td>
                         <td style={{ padding: '12px', fontSize: '12px' }}>₹{req.initialDeposit}</td>
+                        <td style={{ padding: '12px', fontSize: '11px', color: '#4A6080' }}>
+                          {req.createdAt ? new Date(req.createdAt).toLocaleString() : 'N/A'}
+                        </td>
                         <td style={{ padding: '12px', fontSize: '12px' }}>
                           <span style={{
                             background: 'rgba(245,200,66,0.2)',
@@ -1000,14 +1027,33 @@ export default function EmployeeDashboard() {
                   {selectedAccount && (
                     <div style={{ fontSize: '12px', color: '#4A6080' }}>
                       <span style={{
-                        background: selectedAccount?.accountType?.toUpperCase() === 'SAVING' ? 'rgba(255,184,0,0.2)' : 'rgba(59,158,255,0.2)',
-                        color: selectedAccount?.accountType?.toUpperCase() === 'SAVING' ? '#FFB800' : '#3B9EFF',
+                        background: (() => {
+                          const type = selectedAccount?.accountType?.toUpperCase() || 'CURRENT'
+                          if (type === 'SAVING') return 'rgba(255,184,0,0.2)'
+                          if (type === 'FIXED_DEPOSIT') return 'rgba(200,0,255,0.2)'
+                          if (type === 'SALARY') return 'rgba(0,255,150,0.2)'
+                          return 'rgba(59,158,255,0.2)'
+                        })(),
+                        color: (() => {
+                          const type = selectedAccount?.accountType?.toUpperCase() || 'CURRENT'
+                          if (type === 'SAVING') return '#FFB800'
+                          if (type === 'FIXED_DEPOSIT') return '#C800FF'
+                          if (type === 'SALARY') return '#00FF96'
+                          return '#3B9EFF'
+                        })(),
                         padding: '4px 10px',
                         borderRadius: '4px',
                         fontSize: '11px',
                         fontWeight: '700'
                       }}>
-                        {selectedAccount?.accountType?.toUpperCase() === 'SAVING' ? '🏦 SAVING' : '💼 CURRENT'} - {selectedAccount?.accountNumber}
+                        {(() => {
+                          const type = selectedAccount?.accountType?.toUpperCase() || 'CURRENT'
+                          let icon = '💼'
+                          if (type === 'SAVING') icon = '🏦'
+                          else if (type === 'FIXED_DEPOSIT') icon = '📦'
+                          else if (type === 'SALARY') icon = '💰'
+                          return `${icon} ${type} - ${selectedAccount?.accountNumber}`
+                        })()}
                       </span>
                     </div>
                   )}

@@ -17,6 +17,7 @@ public class Account {
     private String status;  // PENDING, ACTIVE, BLOCKED, FROZEN
     private Double minimumDepositRequired;  // Required minimum deposit
     private Boolean minimumDepositPaid;  // Has minimum deposit been paid?
+    private String transactionPin;  // 4-digit PIN for this account
     private LocalDateTime createdAt;
     private LocalDateTime activatedAt;
 }
