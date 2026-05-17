@@ -30,18 +30,38 @@ public class AccountRequestService {
 
     // Get account requests based on user role
     public List<AccountRequest> getAccountRequests(String userId, String userRole) {
+        List<AccountRequest> requests;
+
         if (UserRole.EMPLOYEE.name().equals(userRole)) {
-            // Employees see pending requests
-            return accountRequestRepository.findByStatusOrderByCreatedAtDesc("PENDING");
+            requests = accountRequestRepository.findByStatusOrderByCreatedAtDesc("PENDING");
         } else if (UserRole.MANAGER.name().equals(userRole)) {
-            // Managers see all pending requests
-            return accountRequestRepository.findByStatusOrderByCreatedAtDesc("PENDING");
+            requests = accountRequestRepository.findByStatusOrderByCreatedAtDesc("PENDING");
         } else if (UserRole.ADMIN.name().equals(userRole)) {
-            // Admins see all requests
-            return accountRequestRepository.findAll();
+            requests = accountRequestRepository.findAll();
         } else {
-            // Users see only their own requests
-            return accountRequestRepository.findByUserId(userId);
+            requests = accountRequestRepository.findByUserId(userId);
+        }
+
+        // Enrich requests with user data if missing
+        enrichRequestsWithUserData(requests);
+        return requests;
+    }
+
+    private void enrichRequestsWithUserData(List<AccountRequest> requests) {
+        for (AccountRequest req : requests) {
+            // If userName or userPhone is missing, fetch from User
+            if ((req.getUserName() == null || req.getUserName().isEmpty() || "N/A".equals(req.getUserName())) &&
+                (req.getUserPhone() == null || req.getUserPhone().isEmpty() || "N/A".equals(req.getUserPhone()))) {
+                try {
+                    User user = userRepository.findById(req.getUserId()).orElse(null);
+                    if (user != null) {
+                        req.setUserName(user.getFirstName() + " " + user.getLastName());
+                        req.setUserPhone(user.getPhone());
+                    }
+                } catch (Exception e) {
+                    System.err.println("[ENRICH] Failed to fetch user data for request: " + req.getId());
+                }
+            }
         }
     }
 
@@ -52,13 +72,23 @@ public class AccountRequestService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Check if user already has this account type - REJECT IMMEDIATELY
-        List<Account> existingAccounts = accountRepository.findByUserId(userId);
-        for (Account acc : existingAccounts) {
-            if (acc.getAccountType().equalsIgnoreCase(accountType)) {
+        // Check for any existing account of this type (active or inactive)
+        List<Account> userAccounts = accountRepository.findByUserId(userId);
+        for (Account account : userAccounts) {
+            if (account.getAccountType().equalsIgnoreCase(accountType)) {
                 throw new RuntimeException(
                     "You already have a " + accountType + " account. " +
-                    "Cannot create duplicate account type.");
+                    "Cannot create multiple accounts of the same type.");
+            }
+        }
+
+        // Check for pending requests of this type
+        List<AccountRequest> pendingRequests = accountRequestRepository.findByStatusOrderByCreatedAtDesc("PENDING");
+        for (AccountRequest req : pendingRequests) {
+            if (req.getUserId().equals(userId) && req.getAccountType().equalsIgnoreCase(accountType)) {
+                throw new RuntimeException(
+                    "You already have a pending request for a " + accountType + " account. " +
+                    "Please wait for approval or rejection.");
             }
         }
 
@@ -120,6 +150,11 @@ public class AccountRequestService {
         account.setMinimumDepositPaid(true);
         account.setCreatedAt(LocalDateTime.now());
         account.setActivatedAt(LocalDateTime.now());
+
+        // Set transaction PIN from user's registration Phase 4
+        if (user.getTransactionPin() != null && !user.getTransactionPin().isEmpty()) {
+            account.setTransactionPin(user.getTransactionPin());
+        }
 
         accountRepository.save(account);
 

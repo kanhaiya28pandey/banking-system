@@ -52,6 +52,10 @@ public class AccountService {
             }
         }
 
+        // Get user to access transaction PIN
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
         // Create new account with minimum deposit
         Account account = new Account();
         account.setUserId(userId);
@@ -64,11 +68,14 @@ public class AccountService {
         account.setCreatedAt(LocalDateTime.now());
         account.setActivatedAt(LocalDateTime.now());
 
+        // Transfer transaction PIN from user's registration
+        if (user.getTransactionPin() != null && !user.getTransactionPin().isEmpty()) {
+            account.setTransactionPin(user.getTransactionPin());
+        }
+
         Account savedAccount = accountRepository.save(account);
 
         // Set user's account status to PENDING_VERIFICATION
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
         if (user.getAccountStatus() == null) {
             user.setAccountStatus("PENDING_VERIFICATION");
             user.setUpdatedAt(LocalDateTime.now());
