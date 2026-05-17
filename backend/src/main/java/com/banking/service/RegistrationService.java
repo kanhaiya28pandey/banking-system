@@ -56,6 +56,8 @@ public class RegistrationService {
             user.setMiddleName(phase1.getMiddleName());
             user.setLastName(phase1.getLastName());
             user.setFullName(phase1.getFirstName() + " " + phase1.getLastName());
+            user.setName(phase1.getFirstName() + " " + phase1.getLastName()); // Also set name field
+            user.setPhone(phase1.getPhone()); // Set phone from Phase 1
             user.setFathersName(phase1.getFathersName());
             user.setGender(phase1.getGender());
             user.setDateOfBirth(phase1.getDateOfBirth());
@@ -111,6 +113,8 @@ public class RegistrationService {
         user.setMiddleName(phase1.getMiddleName());
         user.setLastName(phase1.getLastName());
         user.setFullName(phase1.getFirstName() + " " + phase1.getLastName());
+        user.setName(phase1.getFirstName() + " " + phase1.getLastName()); // Also set name field
+        user.setPhone(phase1.getPhone()); // Set phone from Phase 1
         user.setFathersName(phase1.getFathersName());
         user.setGender(phase1.getGender());
         user.setDateOfBirth(phase1.getDateOfBirth());
