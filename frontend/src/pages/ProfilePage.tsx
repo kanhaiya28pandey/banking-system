@@ -18,9 +18,9 @@ export default function ProfilePage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [tab, setTab] = useState<'info'|'security'|'kyc'|'pin'>('info')
   const [accounts, setAccounts] = useState<any[]>([])
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('')
   const [pin, setPin] = useState({ newPin: '', confirmPin: '' })
   const [pinLoading, setPinLoading] = useState(false)
-  const [hasPin, setHasPin] = useState(false)
   const [showNewPin, setShowNewPin] = useState(false)
   const [showConfirmPin, setShowConfirmPin] = useState(false)
 
@@ -46,13 +46,6 @@ export default function ProfilePage() {
         } catch (err) {
           console.error('Failed to load accounts:', err)
         }
-
-        try {
-          const pinRes = await api.get(`/user/has-transaction-pin/${user.id}`)
-          setHasPin(pinRes.data.data === true)
-        } catch {
-          setHasPin(false)
-        }
       }
       fetchData()
     }
@@ -63,9 +56,31 @@ export default function ProfilePage() {
     setLoading(true)
     try {
       const res = await api.put(`/user/update/${user.id}`, { name: form.name, phone: form.phone })
-      if (res.data.success) { dispatch(setCredentials({ user: { ...user, ...res.data.data }, token })); toast.success('Profile updated!') }
+      if (res.data.success) {
+        const updatedUser = {
+          ...user,
+          ...res.data.data,
+          name: form.name,
+          phone: form.phone,
+          firstName: form.name.split(' ')[0],
+          lastName: form.name.split(' ').slice(1).join(' ')
+        }
+        dispatch(setCredentials({ user: updatedUser, token }))
+        toast.success('Profile updated successfully!')
+        // Refresh user data and accounts
+        setTimeout(async () => {
+          try {
+            const userRes = await api.get(`/user/${user.id}`)
+            if (userRes.data.success) {
+              dispatch(setCredentials({ user: userRes.data.data, token }))
+            }
+          } catch (err) {
+            console.error('Failed to refresh user:', err)
+          }
+        }, 500)
+      }
       else toast.error(res.data.message)
-    } catch { toast.error('Failed') }
+    } catch { toast.error('Failed to update profile') }
     setLoading(false)
   }
 
@@ -83,18 +98,18 @@ export default function ProfilePage() {
   }
 
   const handleChangePin = async () => {
+    if (!selectedAccountId) { toast.error('Please select an account'); return }
     if (!pin.newPin||!pin.confirmPin) { toast.error('Fill all fields'); return }
     if (pin.newPin !== pin.confirmPin) { toast.error('PINs do not match'); return }
     if (pin.newPin.length !== 4 || !/^\d+$/.test(pin.newPin)) { toast.error('PIN must be 4 digits'); return }
     setPinLoading(true)
     try {
-      const res = await api.put(`/user/update/${user.id}`, { transactionPin: pin.newPin })
+      const res = await api.put(`/user/account/${selectedAccountId}/update-pin?transactionPin=${pin.newPin}`, {})
       if (res.data.success) {
-        setHasPin(true)
         setPin({ newPin: '', confirmPin: '' })
-        toast.success('Transaction PIN set successfully!')
+        toast.success('Transaction PIN updated for this account!')
       } else toast.error(res.data.message)
-    } catch { toast.error('Failed to update PIN') }
+    } catch (err: any) { toast.error(err.response?.data?.message || 'Failed to update PIN') }
     setPinLoading(false)
   }
 
@@ -123,8 +138,8 @@ export default function ProfilePage() {
             </div>
             <div style={{ background: 'rgba(10,18,32,0.85)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '18px', padding: '22px' }}>
               <div style={{ fontSize: '10px', color: '#3A5070', letterSpacing: '2px', marginBottom: '16px' }}>ACCOUNT INFO</div>
-              {[{ label: 'User ID', value: user?.id?.slice(0,12)+'...'||'N/A' }, { label: 'Phone', value: user?.phone||'Not set' }, { label: 'Status', value: user?.status||'ACTIVE' }].map((item, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+              {[{ label: 'User ID', value: user?.id?.slice(0,12)+'...'||'N/A' }, { label: 'Name', value: user?.name || user?.firstName || 'Not set' }, { label: 'Phone', value: user?.phone||'Not set' }, { label: 'Status', value: user?.status||'ACTIVE' }].map((item, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
                   <span style={{ fontSize: '12px', color: '#4A6080' }}>{item.label}</span>
                   <span style={{ fontSize: '12px', fontWeight: '600' }}>{item.value}</span>
                 </div>
@@ -185,40 +200,65 @@ export default function ProfilePage() {
                 <>
                   <div style={{ fontSize: '13px', fontWeight: '700', color: '#F5C842', marginBottom: '28px', letterSpacing: '2px' }}>TRANSACTION PIN SECURITY</div>
 
-                  <div style={{ background: 'rgba(59,158,255,0.08)', border: '1px solid rgba(59,158,255,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontSize: '20px' }}>🔐</span>
-                      <div>
-                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#3B9EFF' }}>PIN Status</div>
-                        <div style={{ fontSize: '13px', color: '#4A6080', marginTop: '4px' }}>
-                          {hasPin ? '✓ You have a transaction PIN set' : '⚠ No transaction PIN set yet'}
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>SELECT ACCOUNT</label>
+                    <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+                      <option value="">-- Choose an account --</option>
+                      {accounts.map((acc: any) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.accountType?.toUpperCase()} • {acc.accountNumber} • ₹{acc.balance?.toLocaleString() || '0'}
+                        </option>
+                      ))}
+                    </select>
+                    {!selectedAccountId && accounts.length === 0 && (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#FF4D6D' }}>ℹ️ You don't have any accounts yet</div>
+                    )}
+                  </div>
+
+                  {selectedAccountId && (
+                    <div style={{ background: 'rgba(59,158,255,0.08)', border: '1px solid rgba(59,158,255,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '20px' }}>🔐</span>
+                        <div>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#3B9EFF' }}>PIN Status</div>
+                          <div style={{ fontSize: '13px', color: '#4A6080', marginTop: '4px' }}>
+                            Set a unique 4-digit PIN for this account's secure transactions
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>NEW 4-DIGIT PIN</label>
-                    <div style={{ position: 'relative' }}>
-                      <input type={showNewPin?'text':'password'} maxLength={4} inputMode="numeric" style={{ ...inp, paddingRight: '52px', letterSpacing: '4px', fontSize: '18px', fontWeight: 'bold' }} value={pin.newPin} onChange={e => setPin({...pin, newPin: e.target.value.replace(/\D/g, '').slice(0, 4)})} placeholder="••••" />
-                      <button onClick={() => setShowNewPin(!showNewPin)} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: showNewPin?'#3B9EFF':'#4A6080', padding: 0 }}>{showNewPin?'🙈':'👁️'}</button>
+                  {selectedAccountId ? (
+                    <>
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>NEW 4-DIGIT PIN</label>
+                        <div style={{ position: 'relative' }}>
+                          <input type={showNewPin?'text':'password'} maxLength={4} inputMode="numeric" style={{ ...inp, paddingRight: '52px', letterSpacing: '4px', fontSize: '18px', fontWeight: 'bold' }} value={pin.newPin} onChange={e => setPin({...pin, newPin: e.target.value.replace(/\D/g, '').slice(0, 4)})} placeholder="••••" />
+                          <button onClick={() => setShowNewPin(!showNewPin)} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: showNewPin?'#3B9EFF':'#4A6080', padding: 0 }}>{showNewPin?'🙈':'👁️'}</button>
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: '28px' }}>
+                        <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>CONFIRM PIN</label>
+                        <div style={{ position: 'relative' }}>
+                          <input type={showConfirmPin?'text':'password'} maxLength={4} inputMode="numeric" style={{ ...inp, paddingRight: '52px', letterSpacing: '4px', fontSize: '18px', fontWeight: 'bold' }} value={pin.confirmPin} onChange={e => setPin({...pin, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 4)})} placeholder="••••" />
+                          <button onClick={() => setShowConfirmPin(!showConfirmPin)} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: showConfirmPin?'#3B9EFF':'#4A6080', padding: 0 }}>{showConfirmPin?'🙈':'👁️'}</button>
+                        </div>
+                        {pin.confirmPin && <div style={{ marginTop: '8px', fontSize: '12px', color: pin.newPin===pin.confirmPin?'#00FFB2':'#FF4D6D' }}>{pin.newPin===pin.confirmPin?'✓ Match':'✗ No match'}</div>}
+                      </div>
+
+                      <div style={{ background: 'rgba(0,255,178,0.05)', border: '1px solid rgba(0,255,178,0.2)', borderRadius: '12px', padding: '12px', marginBottom: '24px', fontSize: '12px', color: '#00FFB2', lineHeight: '1.6' }}>
+                        ℹ️ Use this 4-digit PIN to verify sensitive transactions like quick transfers and withdrawals at ATM. Keep it secret and never share it with anyone.
+                      </div>
+
+                      <button onClick={handleChangePin} disabled={pinLoading || pin.newPin.length !== 4 || pin.confirmPin.length !== 4} style={{ background: pin.newPin.length === 4 && pin.confirmPin.length === 4 ? 'linear-gradient(135deg, #F5C842, #D4A017)' : 'rgba(245,200,66,0.3)', color: '#060A12', border: 'none', borderRadius: '12px', padding: '16px 40px', fontSize: '12px', fontWeight: '700', cursor: pin.newPin.length === 4 ? 'pointer' : 'not-allowed', letterSpacing: '1.5px', opacity: pinLoading?0.7:1 }}>{pinLoading?'SAVING...':'SET PIN FOR THIS ACCOUNT →'}</button>
+                    </>
+                  ) : (
+                    <div style={{ background: 'rgba(255,77,109,0.1)', border: '1px solid rgba(255,77,109,0.3)', borderRadius: '12px', padding: '20px', textAlign: 'center', color: '#FF4D6D' }}>
+                      Please select an account above to set its transaction PIN
                     </div>
-                  </div>
-
-                  <div style={{ marginBottom: '28px' }}>
-                    <label style={{ fontSize: '11px', color: '#4A6080', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>CONFIRM PIN</label>
-                    <div style={{ position: 'relative' }}>
-                      <input type={showConfirmPin?'text':'password'} maxLength={4} inputMode="numeric" style={{ ...inp, paddingRight: '52px', letterSpacing: '4px', fontSize: '18px', fontWeight: 'bold' }} value={pin.confirmPin} onChange={e => setPin({...pin, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 4)})} placeholder="••••" />
-                      <button onClick={() => setShowConfirmPin(!showConfirmPin)} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: showConfirmPin?'#3B9EFF':'#4A6080', padding: 0 }}>{showConfirmPin?'🙈':'👁️'}</button>
-                    </div>
-                    {pin.confirmPin && <div style={{ marginTop: '8px', fontSize: '12px', color: pin.newPin===pin.confirmPin?'#00FFB2':'#FF4D6D' }}>{pin.newPin===pin.confirmPin?'✓ Match':'✗ No match'}</div>}
-                  </div>
-
-                  <div style={{ background: 'rgba(0,255,178,0.05)', border: '1px solid rgba(0,255,178,0.2)', borderRadius: '12px', padding: '12px', marginBottom: '24px', fontSize: '12px', color: '#00FFB2', lineHeight: '1.6' }}>
-                    ℹ️ Use this 4-digit PIN to verify sensitive transactions like quick transfers and withdrawals at ATM. Keep it secret and never share it with anyone.
-                  </div>
-
-                  <button onClick={handleChangePin} disabled={pinLoading || pin.newPin.length !== 4 || pin.confirmPin.length !== 4} style={{ background: pin.newPin.length === 4 && pin.confirmPin.length === 4 ? 'linear-gradient(135deg, #F5C842, #D4A017)' : 'rgba(245,200,66,0.3)', color: '#060A12', border: 'none', borderRadius: '12px', padding: '16px 40px', fontSize: '12px', fontWeight: '700', cursor: pin.newPin.length === 4 ? 'pointer' : 'not-allowed', letterSpacing: '1.5px', opacity: pinLoading?0.7:1 }}>{pinLoading?'SAVING...':hasPin?'UPDATE PIN →':'SET PIN →'}</button>
+                  )}
                 </>
               )}
               {tab === 'kyc' && (
@@ -250,6 +290,8 @@ export default function ProfilePage() {
                     <div style={{ fontSize: '12px', color: '#3B9EFF', fontWeight: '700', marginBottom: '16px', letterSpacing: '1px' }}>KYC INFORMATION</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                       {[
+                        { label: 'Full Name', value: user?.name || user?.firstName || 'Not provided' },
+                        { label: 'Phone Number', value: user?.phone || 'Not provided' },
                         { label: 'Religion', value: user?.religion || 'Not provided' },
                         { label: 'Category', value: user?.category || 'Not provided' },
                         { label: 'Income Range', value: user?.incomeRange || 'Not provided' },
