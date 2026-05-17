@@ -22,6 +22,15 @@ public class UserController {
             @RequestParam String email) {
         return userRepository.findByEmail(email)
                 .map(u -> {
+                    // Ensure name field is populated from firstName/lastName if empty
+                    if ((u.getName() == null || u.getName().isEmpty()) &&
+                        u.getFirstName() != null && !u.getFirstName().isEmpty()) {
+                        String fullName = u.getFirstName();
+                        if (u.getLastName() != null && !u.getLastName().isEmpty()) {
+                            fullName += " " + u.getLastName();
+                        }
+                        u.setName(fullName);
+                    }
                     u.setPassword(null);
                     u.setTransactionPin(null);
                     return ResponseEntity.ok(
@@ -299,6 +308,25 @@ public class UserController {
             userService.deleteAbandonedProfile(userId, deletedBy);
             return ResponseEntity.ok(
                 new ApiResponse<>(true, "Profile deleted successfully", null));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Update transaction PIN for a specific account
+    @PutMapping("/account/{accountId}/update-pin")
+    public ResponseEntity<ApiResponse<String>> updateAccountTransactionPin(
+            @PathVariable String accountId,
+            @RequestParam String transactionPin) {
+        try {
+            if (transactionPin == null || transactionPin.isEmpty() || transactionPin.length() != 4 || !transactionPin.matches("\\d+")) {
+                return ResponseEntity.ok(
+                    new ApiResponse<>(false, "PIN must be exactly 4 digits", null));
+            }
+            userService.updateAccountTransactionPin(accountId, transactionPin);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Transaction PIN updated successfully for this account", null));
         } catch (Exception e) {
             return ResponseEntity.ok(
                 new ApiResponse<>(false, e.getMessage(), null));
