@@ -47,6 +47,7 @@ export default function MultiStepRegistration() {
               middleName: userData.middleName || '',
               lastName: userData.lastName || '',
               fathersName: userData.fathersName || '',
+              phone: userData.phone || '',
               gender: userData.gender || '',
               dateOfBirth: userData.dateOfBirth || '',
               address: userData.address || '',
@@ -114,7 +115,7 @@ export default function MultiStepRegistration() {
   // Phase 1: Personal Details (email removed - already have it)
   const [phase1, setPhase1] = useState({
     firstName: '', middleName: '', lastName: '', fathersName: '',
-    gender: '', dateOfBirth: '', address: '', city: '', state: '', pinCode: ''
+    gender: '', dateOfBirth: '', address: '', city: '', state: '', pinCode: '', phone: ''
   })
 
   // Phase 2: KYC
@@ -152,6 +153,7 @@ export default function MultiStepRegistration() {
     if (!phase1.fathersName.trim()) errors.push("Father's name is required")
     if (!phase1.gender) errors.push('Gender is required')
     if (!phase1.dateOfBirth) errors.push('Date of birth is required')
+    if (!phase1.phone.trim() || !/^\d{10}$/.test(phase1.phone)) errors.push('Phone must be 10 digits')
     if (!phase1.address.trim() || phase1.address.length < 10) errors.push('Address must be at least 10 characters')
     if (!phase1.city.trim()) errors.push('City is required')
     if (!phase1.state) errors.push('State is required')
@@ -421,6 +423,11 @@ export default function MultiStepRegistration() {
             <div style={{ marginBottom: '12px' }}>
               <label style={labelStyle}>Father's Name *</label>
               <input type="text" value={phase1.fathersName} onChange={e => setPhase1({...phase1, fathersName: e.target.value})} placeholder="Father's name" disabled={isSecondAccount} style={isSecondAccount ? disabledInputStyle : inputStyle} />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={labelStyle}>Phone Number *</label>
+              <input type="tel" value={phase1.phone} onChange={e => setPhase1({...phase1, phone: e.target.value})} placeholder="10-digit phone" disabled={isSecondAccount} style={isSecondAccount ? disabledInputStyle : inputStyle} />
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
