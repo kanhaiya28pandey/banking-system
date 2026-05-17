@@ -2,6 +2,7 @@ package com.banking.service;
 
 import com.banking.model.User;
 import com.banking.repository.UserRepository;
+import com.banking.repository.AccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,9 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private AccountRepository accountRepository;
 
     @Autowired(required = false)
     private BCryptPasswordEncoder passwordEncoder;
@@ -220,11 +224,18 @@ public class UserService {
         return saved;
     }
 
-    // Get all users for employee (all customers)
+    // Get all users for employee (all customers with at least one account)
     public List<User> getAllCustomersForEmployee() {
         List<User> customers = userRepository.findByRole("USER");
-        customers.forEach(u -> u.setPassword(null));
-        return customers;
+        // Filter to show only customers who have created accounts
+        List<User> customersWithAccounts = customers.stream()
+                .filter(u -> {
+                    List<?> userAccounts = accountRepository.findByUserId(u.getId());
+                    return userAccounts != null && !userAccounts.isEmpty();
+                })
+                .collect(Collectors.toList());
+        customersWithAccounts.forEach(u -> u.setPassword(null));
+        return customersWithAccounts;
     }
 
     // Update user information by employee
@@ -279,8 +290,15 @@ public class UserService {
     // Get pending verification accounts
     public List<User> getPendingVerificationAccounts() {
         List<User> pending = userRepository.findAll().stream()
-                .filter(u -> "PENDING_VERIFICATION".equals(u.getAccountStatus()) ||
-                             (u.getAccountStatus() == null && "USER".equals(u.getRole())))
+                .filter(u -> {
+                    // Users who completed registration but haven't created any accounts
+                    if (!"COMPLETED".equals(u.getRegistrationPhase())) {
+                        return false;
+                    }
+                    // Must have no accounts
+                    List<?> userAccounts = accountRepository.findByUserId(u.getId());
+                    return userAccounts == null || userAccounts.isEmpty();
+                })
                 .collect(Collectors.toList());
         pending.forEach(u -> u.setPassword(null));
         return pending;
@@ -301,5 +319,50 @@ public class UserService {
         User saved = userRepository.save(user);
         saved.setPassword(null);
         return saved;
+    }
+
+    // Get abandoned profiles (incomplete registration - PHASE_1 through PHASE_4)
+    public List<User> getAbandonedProfiles() {
+        List<User> allUsers = userRepository.findAll();
+        List<User> abandoned = allUsers.stream()
+                .filter(u -> {
+                    // User must have incomplete registration phase (PHASE_1, PHASE_2, PHASE_3, PHASE_4)
+                    String phase = u.getRegistrationPhase();
+                    if (phase == null || "COMPLETED".equals(phase)) {
+                        return false; // Skip null or completed users
+                    }
+                    if (!phase.startsWith("PHASE_")) {
+                        return false; // Only incomplete phases
+                    }
+                    // User must not have any accounts
+                    List<?> userAccounts = accountRepository.findByUserId(u.getId());
+                    return userAccounts == null || userAccounts.isEmpty();
+                })
+                .collect(Collectors.toList());
+        abandoned.forEach(u -> u.setPassword(null));
+        return abandoned;
+    }
+
+    // Delete abandoned profile (only employee/manager)
+    @Transactional
+    public void deleteAbandonedProfile(String userId, String deletedBy) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check if user is actually abandoned (incomplete phase and no accounts)
+        String phase = user.getRegistrationPhase();
+        if (phase == null || "COMPLETED".equals(phase) || !phase.startsWith("PHASE_")) {
+            throw new RuntimeException("Only abandoned profiles (with incomplete PHASE) can be deleted");
+        }
+
+        List<?> userAccounts = accountRepository.findByUserId(userId);
+        if (userAccounts != null && !userAccounts.isEmpty()) {
+            throw new RuntimeException("Cannot delete profile with existing accounts");
+        }
+
+        // Soft delete by marking as DELETED
+        user.setStatus("DELETED");
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
     }
 }

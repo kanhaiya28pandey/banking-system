@@ -23,10 +23,14 @@ public class AccountRequest {
 
     private String createdBy;           // Employee who created request
     private String approvedBy;          // Who approved (Employee/Manager)
-    private String rejectedBy;          // Who rejected (Manager only)
+    private String rejectedBy;          // Who rejected (Employee/Manager)
     private String rejectionReason;     // If rejected
 
     private Double initialDeposit;
+
+    // User details for display
+    private String userName;            // User's full name for display
+    private String userPhone;           // User's phone for display
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

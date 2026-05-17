@@ -29,18 +29,30 @@ public class TransactionService {
 
     @Transactional
     public Transaction deposit(String accountNumber, Double amount) {
+        System.out.println("📝 DEPOSIT ATTEMPT: Account=" + accountNumber + ", Amount=" + amount);
+
         Account account = accountRepository
             .findByAccountNumber(accountNumber)
             .orElseThrow(() -> new RuntimeException("Account not found"));
+
+        System.out.println("✓ Account found. UserId=" + account.getUserId());
+
         if ("BLOCKED".equals(account.getStatus()))
             throw new RuntimeException("Account is blocked");
 
         // Check if user account is verified
         User user = userRepository.findById(account.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        if (!"VERIFIED".equals(user.getAccountStatus())) {
-            throw new RuntimeException("Account not verified. Please wait for employee verification.");
+
+        System.out.println("✓ User found. AccountStatus=" + user.getAccountStatus() + ", Role=" + user.getRole());
+
+        // If accountStatus is null or not VERIFIED, throw error
+        if (user.getAccountStatus() == null || !"VERIFIED".equals(user.getAccountStatus())) {
+            System.out.println("❌ VERIFICATION FAILED - AccountStatus is: " + user.getAccountStatus());
+            throw new RuntimeException("⛔ Account not verified. Please wait for employee verification before performing transactions.");
         }
+
+        System.out.println("✓ Verification PASSED - Proceeding with deposit");
 
         account.setBalance(account.getBalance() + amount);
         accountRepository.save(account);
@@ -53,10 +65,11 @@ public class TransactionService {
         tx.setDescription("Deposit");
         Transaction saved = transactionRepository.save(tx);
 
+        System.out.println("✓ Deposit successful. TransactionId=" + saved.getId());
+
         // Send notification
         try {
             notificationService.sendTransactionNotification(saved, account, user);
-            // Broadcast balance update via WebSocket
             websocketBalanceService.broadcastBalanceUpdate(account.getUserId(), accountNumber);
         } catch (Exception e) {
             System.err.println("Notification error: " + e.getMessage());
@@ -67,22 +80,50 @@ public class TransactionService {
 
     @Transactional
     public Transaction withdraw(String accountNumber, Double amount) {
+        System.out.println("📝 WITHDRAW ATTEMPT: Account=" + accountNumber + ", Amount=" + amount);
+
         Account account = accountRepository
             .findByAccountNumber(accountNumber)
             .orElseThrow(() -> new RuntimeException("Account not found"));
+
+        System.out.println("✓ Account found. UserId=" + account.getUserId() + ", Status=" + account.getStatus());
+
+        // Check if account status is ACTIVE
+        if (account.getStatus() == null || !"ACTIVE".equals(account.getStatus())) {
+            throw new RuntimeException("Account is not active. Current status: " + account.getStatus());
+        }
+
         if ("BLOCKED".equals(account.getStatus()))
             throw new RuntimeException("Account is blocked");
 
         // Check if user account is verified
         User user = userRepository.findById(account.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        if (!"VERIFIED".equals(user.getAccountStatus())) {
-            throw new RuntimeException("Account not verified. Please wait for employee verification.");
+
+        System.out.println("✓ User found. AccountStatus=" + user.getAccountStatus() + ", Role=" + user.getRole());
+
+        // If accountStatus is null or not VERIFIED, throw error
+        if (user.getAccountStatus() == null || !"VERIFIED".equals(user.getAccountStatus())) {
+            System.out.println("❌ VERIFICATION FAILED - AccountStatus is: " + user.getAccountStatus());
+            throw new RuntimeException("⛔ Account not verified. Please wait for employee verification before performing transactions.");
         }
+
+        System.out.println("✓ Verification PASSED - Proceeding with withdrawal");
 
         if (account.getBalance() < amount)
             throw new RuntimeException("Insufficient balance");
-        account.setBalance(account.getBalance() - amount);
+
+        // Check minimum deposit protection
+        Double minimumDeposit = account.getMinimumDepositRequired() != null ? account.getMinimumDepositRequired() : 0.0;
+        Double balanceAfterWithdrawal = account.getBalance() - amount;
+
+        if (minimumDeposit > 0 && balanceAfterWithdrawal < minimumDeposit) {
+            throw new RuntimeException("Cannot withdraw. Your account must maintain a minimum deposit of ₹" + minimumDeposit.intValue() +
+                ". Current balance: ₹" + account.getBalance().intValue() + ", Maximum withdrawable: ₹" +
+                (int)(account.getBalance() - minimumDeposit));
+        }
+
+        account.setBalance(balanceAfterWithdrawal);
         accountRepository.save(account);
         Transaction tx = new Transaction();
         tx.setFromAccount(accountNumber);
@@ -93,10 +134,11 @@ public class TransactionService {
         tx.setDescription("Withdrawal");
         Transaction saved = transactionRepository.save(tx);
 
+        System.out.println("✓ Withdrawal successful. TransactionId=" + saved.getId());
+
         // Send notification
         try {
             notificationService.sendTransactionNotification(saved, account, user);
-            // Broadcast balance update via WebSocket
             websocketBalanceService.broadcastBalanceUpdate(account.getUserId(), accountNumber);
         } catch (Exception e) {
             System.err.println("Notification error: " + e.getMessage());
@@ -107,12 +149,25 @@ public class TransactionService {
 
     @Transactional
     public Transaction transfer(TransactionRequest req) {
+        System.out.println("📝 TRANSFER ATTEMPT: From=" + req.getFromAccount() + ", To=" + req.getToAccount() + ", Amount=" + req.getAmount());
+
         Account from = accountRepository
             .findByAccountNumber(req.getFromAccount())
             .orElseThrow(() -> new RuntimeException("Source account not found"));
         Account to = accountRepository
             .findByAccountNumber(req.getToAccount())
             .orElseThrow(() -> new RuntimeException("Destination account not found"));
+
+        System.out.println("✓ Both accounts found. FromUserId=" + from.getUserId() + ", ToUserId=" + to.getUserId());
+
+        // Check if both accounts are ACTIVE
+        if (from.getStatus() == null || !"ACTIVE".equals(from.getStatus())) {
+            throw new RuntimeException("Source account is not active. Status: " + from.getStatus());
+        }
+        if (to.getStatus() == null || !"ACTIVE".equals(to.getStatus())) {
+            throw new RuntimeException("Destination account is not active. Status: " + to.getStatus());
+        }
+
         if ("BLOCKED".equals(from.getStatus()))
             throw new RuntimeException("Source account is blocked");
         if ("BLOCKED".equals(to.getStatus()))
@@ -121,9 +176,16 @@ public class TransactionService {
         // Check if sender account is verified
         User senderUser = userRepository.findById(from.getUserId())
                 .orElseThrow(() -> new RuntimeException("Sender not found"));
-        if (!"VERIFIED".equals(senderUser.getAccountStatus())) {
-            throw new RuntimeException("Your account is not verified. Please wait for employee verification.");
+
+        System.out.println("✓ Sender found. AccountStatus=" + senderUser.getAccountStatus() + ", Role=" + senderUser.getRole());
+
+        // If accountStatus is null or not VERIFIED, throw error
+        if (senderUser.getAccountStatus() == null || !"VERIFIED".equals(senderUser.getAccountStatus())) {
+            System.out.println("❌ VERIFICATION FAILED - AccountStatus is: " + senderUser.getAccountStatus());
+            throw new RuntimeException("⛔ Your account is not verified. Please wait for employee verification before performing transactions.");
         }
+
+        System.out.println("✓ Verification PASSED - Proceeding with transfer");
 
         if (from.getBalance() < req.getAmount())
             throw new RuntimeException("Insufficient balance");
@@ -141,6 +203,8 @@ public class TransactionService {
         tx.setDescription(req.getDescription() != null
             ? req.getDescription() : "Transfer");
         Transaction saved = transactionRepository.save(tx);
+
+        System.out.println("✓ Transfer successful. TransactionId=" + saved.getId());
 
         // Send notifications to both sender and receiver
         try {
@@ -167,17 +231,24 @@ public class TransactionService {
         Account account = accountRepository
             .findByAccountNumber(accountNumber)
             .orElseThrow(() -> new RuntimeException("Account not found"));
-        Optional<User> user = userRepository.findById(account.getUserId());
-        if (user.isEmpty()) {
-            throw new RuntimeException("User not found for account");
-        }
-        String storedPin = user.get().getTransactionPin();
+
+        // Check account-specific transaction PIN first
+        String storedPin = account.getTransactionPin();
+
+        // If account PIN is not set, fallback to user's PIN from registration
         if (storedPin == null || storedPin.isEmpty()) {
-            throw new RuntimeException("No transaction PIN set. Please set a PIN first.");
+            User user = userRepository.findById(account.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+            storedPin = user.getTransactionPin();
+
+            if (storedPin == null || storedPin.isEmpty()) {
+                throw new RuntimeException("No transaction PIN set for this account. Please set a PIN first.");
+            }
         }
+
         // Trim whitespace and compare
         if (!storedPin.trim().equals(providedPin != null ? providedPin.trim() : "")) {
-            throw new RuntimeException("Invalid transaction PIN");
+            throw new RuntimeException("Invalid transaction PIN for this account");
         }
     }
 

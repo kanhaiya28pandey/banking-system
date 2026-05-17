@@ -136,4 +136,39 @@ public class RegistrationController {
             return ResponseEntity.ok(new ApiResponse<>(false, "❌ " + e.getMessage(), null));
         }
     }
+
+    /**
+     * Cancel incomplete registration
+     * Marks registration as ABANDONED but keeps user record
+     * This prevents accounts from being created and keeps audit trail
+     */
+    @DeleteMapping("/cancel")
+    public ResponseEntity<ApiResponse<User>> cancelRegistration(@RequestParam String email) {
+        try {
+            User cancelledUser = registrationService.cancelRegistration(email);
+            return ResponseEntity.ok(new ApiResponse<>(
+                true,
+                "✅ Registration cancelled successfully. You can start over anytime.",
+                cancelledUser));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ApiResponse<>(false, "❌ " + e.getMessage(), null));
+        }
+    }
+
+    /**
+     * Mark registration as abandoned when user navigates away
+     * Called when user clicks back arrow or closes browser during registration
+     */
+    @PutMapping("/mark-abandoned")
+    public ResponseEntity<ApiResponse<String>> markAbandoned(@RequestParam String email) {
+        try {
+            registrationService.cancelRegistration(email);
+            return ResponseEntity.ok(new ApiResponse<>(
+                true,
+                "Registration marked as abandoned",
+                "Abandoned"));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
 }

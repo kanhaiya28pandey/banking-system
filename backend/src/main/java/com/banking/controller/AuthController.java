@@ -15,6 +15,16 @@ public class AuthController {
     @Autowired private AuthService authService;
     @Autowired private PasswordResetService passwordResetService;
 
+    /**
+     * Simple registration - just email and password
+     * User can login but needs to create account after login
+     */
+    @PostMapping("/simple-register")
+    public ResponseEntity<ApiResponse<?>> simpleRegister(
+            @RequestBody SimpleRegistrationRequest req) {
+        return ResponseEntity.ok(authService.simpleRegister(req));
+    }
+
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<String>> register(
             @RequestBody RegisterRequest req) {

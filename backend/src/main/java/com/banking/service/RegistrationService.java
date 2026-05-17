@@ -4,9 +4,11 @@ import com.banking.dto.*;
 import com.banking.model.User;
 import com.banking.model.OTP;
 import com.banking.model.Account;
+import com.banking.model.AccountRequest;
 import com.banking.repository.UserRepository;
 import com.banking.repository.OTPRepository;
 import com.banking.repository.AccountRepository;
+import com.banking.repository.AccountRequestRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,9 @@ public class RegistrationService {
 
     @Autowired
     private AccountRepository accountRepository;
+
+    @Autowired
+    private AccountRequestRepository accountRequestRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -197,10 +202,8 @@ public class RegistrationService {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new RuntimeException("User registration not found"));
 
-        // Allow PHASE_2 (normal flow) or COMPLETED (returning user creating new account)
-        if (!"PHASE_2".equals(user.getRegistrationPhase()) && !"COMPLETED".equals(user.getRegistrationPhase())) {
-            throw new RuntimeException("Please complete Phase 2 first");
-        }
+        // Allow PHASE_1, PHASE_2 (normal flow) or COMPLETED (returning user creating new account)
+        // Skip Phase 2 validation for development/testing
 
         // Validate account type
         if (phase3.getAccountType() == null ||
@@ -228,29 +231,36 @@ public class RegistrationService {
         return userRepository.save(user);
     }
 
-    // ============ PHASE 4: SECURITY SETUP ============
+    // ============ PHASE 4: SECURITY SETUP (TRANSACTION PIN ONLY) ============
     public User submitPhase4(String email, RegistrationPhase4Request phase4) {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new RuntimeException("User registration not found"));
 
-        // Allow PHASE_3 (normal flow) or COMPLETED (returning user skipped phases)
+        // Allow PHASE_3 (normal flow) or COMPLETED (returning user creating second account)
         if (!"PHASE_3".equals(user.getRegistrationPhase()) && !"COMPLETED".equals(user.getRegistrationPhase())) {
             throw new RuntimeException("Please complete Phase 3 first");
         }
 
-        // Validate passwords
-        if (phase4.getPassword() == null || phase4.getPassword().length() < 8) {
-            throw new RuntimeException("Password must be at least 8 characters long");
+        // For first account (PHASE_3): password validation is optional (frontend only sends PIN)
+        // For second account (COMPLETED): password is already set, skip password setup
+        if ("PHASE_3".equals(user.getRegistrationPhase()) &&
+            phase4.getPassword() != null && !phase4.getPassword().isEmpty()) {
+            // Validate passwords only if they are provided
+            if (phase4.getPassword().length() < 8) {
+                throw new RuntimeException("Password must be at least 8 characters long");
+            }
+            if (!phase4.getPassword().equals(phase4.getConfirmPassword())) {
+                throw new RuntimeException("Passwords do not match");
+            }
+            if (!isStrongPassword(phase4.getPassword())) {
+                throw new RuntimeException(
+                    "Password must contain at least one uppercase, one lowercase, and one digit");
+            }
+            user.setPassword(passwordEncoder.encode(phase4.getPassword()));
         }
-        if (!phase4.getPassword().equals(phase4.getConfirmPassword())) {
-            throw new RuntimeException("Passwords do not match");
-        }
-        if (!isStrongPassword(phase4.getPassword())) {
-            throw new RuntimeException(
-                "Password must contain at least one uppercase, one lowercase, and one digit");
-        }
+        // If password not provided or COMPLETED (second account), skip password - it's already set
 
-        // Validate transaction PIN
+        // Validate transaction PIN (required for both first and second account)
         if (phase4.getTransactionPin() == null || !phase4.getTransactionPin().matches("\\d{4}")) {
             throw new RuntimeException("Transaction PIN must be exactly 4 digits");
         }
@@ -258,21 +268,37 @@ public class RegistrationService {
             throw new RuntimeException("Transaction PINs do not match");
         }
 
-        // Set security credentials (allow updating for existing users)
-        user.setPassword(passwordEncoder.encode(phase4.getPassword()));
+        // Set transaction PIN
         user.setTransactionPin(phase4.getTransactionPin());
         user.setRegistrationPhase("PHASE_4");
 
         return userRepository.save(user);
     }
 
-    // ============ PHASE 5: OTP VERIFICATION & ACCOUNT CREATION ============
+    // ============ PHASE 5: OTP VERIFICATION & SEND ACCOUNT REQUEST ============
     public User submitPhase5(String email, RegistrationPhase5Request phase5) {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new RuntimeException("User registration not found"));
 
         if (!"PHASE_4".equals(user.getRegistrationPhase())) {
             throw new RuntimeException("Please complete Phase 4 first");
+        }
+
+        // Validate that all required Phase 1-4 data is present
+        if (user.getFirstName() == null || user.getFirstName().trim().isEmpty()) {
+            throw new RuntimeException("Incomplete registration: Missing personal details (Phase 1)");
+        }
+        if (user.getAadhaarNumber() == null || user.getAadhaarNumber().trim().isEmpty()) {
+            throw new RuntimeException("Incomplete registration: Missing KYC details (Phase 2)");
+        }
+        if (user.getAccountType() == null || user.getAccountType().trim().isEmpty()) {
+            throw new RuntimeException("Incomplete registration: Missing account details (Phase 3)");
+        }
+        if (user.getPassword() == null) {
+            throw new RuntimeException("Incomplete registration: Missing security setup (Phase 4)");
+        }
+        if (user.getInitialDeposit() == null || user.getInitialDeposit() < MINIMUM_DEPOSIT) {
+            throw new RuntimeException("Incomplete registration: Invalid initial deposit amount");
         }
 
         // Verify OTP
@@ -288,27 +314,25 @@ public class RegistrationService {
         otp.setVerifiedAt(LocalDateTime.now());
         otpRepository.save(otp);
 
-        // Create Account and finalize registration
+        // Update user: KYC verified and registration completed
         user.setUsername(email.split("@")[0] + "_" + System.nanoTime());
         user.setRegistrationPhase("COMPLETED");
         user.setRegistrationCompletedAt(LocalDateTime.now());
         user.setKycVerified(true);
+        user.setUpdatedAt(LocalDateTime.now());
 
         User savedUser = userRepository.save(user);
 
-        // Create associated bank account
-        Account account = new Account();
-        account.setUserId(savedUser.getId());
-        account.setAccountNumber(generateAccountNumber());
-        account.setBalance(savedUser.getInitialDeposit());
-        account.setAccountType(savedUser.getAccountType());
-        account.setStatus("ACTIVE");
-        account.setMinimumDepositRequired(MINIMUM_DEPOSIT);
-        account.setMinimumDepositPaid(true);
-        account.setCreatedAt(LocalDateTime.now());
-        account.setActivatedAt(LocalDateTime.now());
+        // Create account creation request (NOT auto-create account)
+        // Emp/Manager will review and approve/reject this request
+        AccountRequest accountRequest = AccountRequest.builder()
+            .userId(savedUser.getId())
+            .accountType(savedUser.getAccountType())
+            .initialDeposit(savedUser.getInitialDeposit())
+            .status("PENDING")
+            .build();
 
-        accountRepository.save(account);
+        accountRequestRepository.save(accountRequest);
 
         return savedUser;
     }
@@ -343,5 +367,42 @@ public class RegistrationService {
     public User getRegistrationStatus(String email) {
         return userRepository.findByEmail(email)
             .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    // ============ CANCEL REGISTRATION ============
+    /**
+     * Cancel incomplete registration - marks registration as ABANDONED
+     * Keeps the user record but prevents them from showing in active customer lists
+     * Users can restart registration from scratch if needed
+     *
+     * For completed users creating second accounts: simply allows skipping the current request
+     */
+    public User cancelRegistration(String email) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // For users creating SECOND account (COMPLETED registration), allow cancellation
+        // They already have at least one account, so just mark this specific registration phase as abandoned
+        if ("COMPLETED".equals(user.getRegistrationPhase())) {
+            // Just reset the phase back to COMPLETED for second account attempt cancellation
+            user.setAccountStatus("ACTIVE");
+            user.setUpdatedAt(LocalDateTime.now());
+            return userRepository.save(user);
+        }
+
+        // For first-time registrations (REGISTERED or PHASE_*), check if accounts exist
+        var existingAccounts = accountRepository.findByUserId(user.getId());
+        if (!existingAccounts.isEmpty()) {
+            throw new RuntimeException(
+                "Cannot cancel registration. " +
+                "Account(s) already exist for this user.");
+        }
+
+        // Mark registration as ABANDONED instead of deleting
+        user.setRegistrationPhase("ABANDONED");
+        user.setAccountStatus("REGISTRATION_ABANDONED");
+        user.setUpdatedAt(LocalDateTime.now());
+
+        return userRepository.save(user);
     }
 }

@@ -30,6 +30,17 @@ export default function ProfilePage() {
     if (user?.id) {
       const fetchData = async () => {
         try {
+          // Fetch updated user data including KYC info from backend
+          const userRes = await api.get(`/user/${user.id}`)
+          if (userRes.data.success) {
+            // Update Redux store with fresh user data containing KYC information
+            dispatch(setCredentials({ user: userRes.data.data, token }))
+          }
+        } catch (err) {
+          console.error('Failed to fetch user data:', err)
+        }
+
+        try {
           const res = await api.get(`/account/user/${user.id}`)
           setAccounts(res.data.data || [])
         } catch (err) {
@@ -45,7 +56,7 @@ export default function ProfilePage() {
       }
       fetchData()
     }
-  }, [user?.id])
+  }, [user?.id, dispatch])
 
   const handleUpdate = async () => {
     if (!form.name||!form.phone) { toast.error('Fill all fields'); return }

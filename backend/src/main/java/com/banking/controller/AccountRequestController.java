@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/account-requests")
+@RequestMapping("/api/account-request")
 public class AccountRequestController {
 
     @Autowired
@@ -32,6 +32,27 @@ public class AccountRequestController {
             response.put("success", true);
             response.put("message", "Account application submitted successfully");
             response.put("data", convertToDTO(request));
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    // Get pending account requests (for Employee/Manager dashboard)
+    @GetMapping("/pending")
+    public ResponseEntity<Map<String, Object>> getPendingAccountRequests() {
+        try {
+            List<AccountRequest> requests = accountRequestService.getAccountRequests("", "EMPLOYEE");
+            List<AccountRequestDTO> dtos = requests.stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", dtos);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
@@ -65,19 +86,29 @@ public class AccountRequestController {
     }
 
     // Employee/Manager approves account
-    @PostMapping("/{requestId}/approve")
+    @PostMapping("/approve/{requestId}")
     public ResponseEntity<Map<String, Object>> approveAccount(
             @PathVariable String requestId,
-            @RequestParam String approverUserId,
+            @RequestParam(name = "approverId", required = false) String approverId,
+            @RequestParam(name = "approverUserId", required = false) String approverUserId,
             @RequestParam String approverRole) {
         try {
-            AccountRequest request = accountRequestService.approveAccount(requestId, approverUserId, approverRole);
+            String userId = approverId != null ? approverId : approverUserId;
+            System.out.println("[APPROVE] Request ID: " + requestId + ", Approver: " + userId + ", Role: " + approverRole);
+
+            AccountRequest request = accountRequestService.approveAccount(requestId, userId, approverRole);
+
+            System.out.println("[APPROVE] ✅ SUCCESS - Account approved for user: " + request.getUserId());
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Account approved successfully");
             response.put("data", convertToDTO(request));
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            System.err.println("[APPROVE] ❌ ERROR: " + e.getMessage());
+            e.printStackTrace();
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", e.getMessage());
@@ -86,14 +117,16 @@ public class AccountRequestController {
     }
 
     // Only Manager can reject account
-    @PostMapping("/{requestId}/reject")
+    @PostMapping("/reject/{requestId}")
     public ResponseEntity<Map<String, Object>> rejectAccount(
             @PathVariable String requestId,
-            @RequestParam String rejectorUserId,
+            @RequestParam(name = "rejectorId", required = false) String rejectorId,
+            @RequestParam(name = "rejectorUserId", required = false) String rejectorUserId,
             @RequestParam String rejectorRole,
             @RequestParam String reason) {
         try {
-            AccountRequest request = accountRequestService.rejectAccount(requestId, rejectorUserId, rejectorRole, reason);
+            String userId = rejectorId != null ? rejectorId : rejectorUserId;
+            AccountRequest request = accountRequestService.rejectAccount(requestId, userId, rejectorRole, reason);
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Account request rejected");
@@ -111,6 +144,8 @@ public class AccountRequestController {
         return AccountRequestDTO.builder()
                 .id(request.getId())
                 .userId(request.getUserId())
+                .userName(request.getUserName())
+                .userPhone(request.getUserPhone())
                 .accountType(request.getAccountType())
                 .status(request.getStatus())
                 .createdBy(request.getCreatedBy())

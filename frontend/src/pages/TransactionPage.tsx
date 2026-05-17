@@ -72,6 +72,24 @@ export default function TransactionPage() {
     setAccounts(res.data.data || [])
   }
 
+  const checkAccountVerification = async (accountNumber: string) => {
+    try {
+      const res = await api.get(`/account/${accountNumber}`)
+      const account = res.data.data
+      if (!account) throw new Error('Account not found')
+
+      const userRes = await api.get(`/user/${account.userId}`)
+      const userData = userRes.data.data
+
+      if (!userData?.accountStatus || userData.accountStatus !== 'VERIFIED') {
+        throw new Error('⛔ Account not verified. Please wait for employee verification before performing transactions.')
+      }
+      return true
+    } catch (err: any) {
+      throw err
+    }
+  }
+
   const handleApplyFilters = async (filters: any) => {
     setSearchLoading(true)
     try {
@@ -97,6 +115,17 @@ export default function TransactionPage() {
 
   const handleDeposit = async (pin?: string) => {
     if (!amount || !selectedAcc) { toast.error('Select account and enter amount'); return }
+
+    // Check verification before showing PIN modal
+    if (!pin) {
+      try {
+        await checkAccountVerification(selectedAcc)
+      } catch (err: any) {
+        const errMsg = err.response?.data?.message || err.message || 'Verification failed'
+        toast.error(errMsg)
+        return
+      }
+    }
 
     if (hasTransactionPin && !pin) {
       setPendingTransaction({ type: 'deposit', amount: parseFloat(amount) })
@@ -135,6 +164,17 @@ export default function TransactionPage() {
   const handleWithdraw = async (pin?: string) => {
     if (!amount || !selectedAcc) { toast.error('Select account and enter amount'); return }
 
+    // Check verification before showing PIN modal
+    if (!pin) {
+      try {
+        await checkAccountVerification(selectedAcc)
+      } catch (err: any) {
+        const errMsg = err.response?.data?.message || err.message || 'Verification failed'
+        toast.error(errMsg)
+        return
+      }
+    }
+
     if (hasTransactionPin && !pin) {
       setPendingTransaction({ type: 'withdraw', amount: parseFloat(amount) })
       setShowPinModal(true)
@@ -172,6 +212,17 @@ export default function TransactionPage() {
   const handleTransfer = async (pin?: string) => {
     if (!fromAcc || !toAcc || !amount) { toast.error('Fill all fields'); return }
     if (fromAcc === toAcc) { toast.error('Same account'); return }
+
+    // Check verification before showing PIN modal
+    if (!pin) {
+      try {
+        await checkAccountVerification(fromAcc)
+      } catch (err: any) {
+        const errMsg = err.response?.data?.message || err.message || 'Verification failed'
+        toast.error(errMsg)
+        return
+      }
+    }
 
     if (hasTransactionPin && !pin) {
       setPendingTransaction({ type: 'transfer', amount: parseFloat(amount) })

@@ -130,6 +130,24 @@ export default function AtmPage() {
     const amt = parseInt(input)
     if (!amt || amt <= 0) { toast.error('Enter valid amount'); return }
     if (!selectedAccount) { toast.error('Select account'); return }
+
+    // CHECK ACCOUNT VERIFICATION FIRST
+    try {
+      const userRes = await api.get(`/user/${user.id}`)
+      const userData = userRes.data.data
+
+      if (!userData?.accountStatus || userData.accountStatus !== 'VERIFIED') {
+        addLog('> ❌ ACCOUNT NOT VERIFIED')
+        addLog('> TRANSACTION BLOCKED')
+        addLog('> WAIT FOR EMPLOYEE/MANAGER VERIFICATION')
+        toast.error('❌ Account not verified yet. Please wait for employee/manager verification.')
+        return
+      }
+    } catch (err) {
+      addLog('> ERROR: VERIFICATION CHECK FAILED')
+      console.error('Failed to check verification:', err)
+    }
+
     if (amt > balance) {
       addLog('> ERROR: INSUFFICIENT FUNDS')
       toast.error('Insufficient!')
@@ -169,6 +187,23 @@ export default function AtmPage() {
     const amt = parseInt(input)
     if (!amt || amt <= 0) { toast.error('Enter valid amount'); return }
     if (!selectedAccount) { toast.error('Select account'); return }
+
+    // CHECK ACCOUNT VERIFICATION FIRST
+    try {
+      const userRes = await api.get(`/user/${user.id}`)
+      const userData = userRes.data.data
+
+      if (!userData?.accountStatus || userData.accountStatus !== 'VERIFIED') {
+        addLog('> ❌ ACCOUNT NOT VERIFIED')
+        addLog('> TRANSACTION BLOCKED')
+        addLog('> WAIT FOR EMPLOYEE/MANAGER VERIFICATION')
+        toast.error('❌ Account not verified yet. Please wait for employee/manager verification.')
+        return
+      }
+    } catch (err) {
+      addLog('> ERROR: VERIFICATION CHECK FAILED')
+      console.error('Failed to check verification:', err)
+    }
 
     if (hasTransactionPin) {
       // Show PIN entry modal

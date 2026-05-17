@@ -276,4 +276,32 @@ public class UserController {
                 new ApiResponse<>(false, e.getMessage(), null));
         }
     }
+
+    // Get abandoned profiles (registered but no accounts created)
+    @GetMapping("/abandoned-profiles")
+    public ResponseEntity<ApiResponse<List<User>>> getAbandonedProfiles() {
+        try {
+            List<User> abandoned = userService.getAbandonedProfiles();
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Abandoned profiles fetched", abandoned));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    // Delete abandoned profile by employee/manager
+    @DeleteMapping("/delete/{userId}")
+    public ResponseEntity<ApiResponse<String>> deleteAbandonedProfile(
+            @PathVariable String userId,
+            @RequestParam(required = false) String deletedBy) {
+        try {
+            userService.deleteAbandonedProfile(userId, deletedBy);
+            return ResponseEntity.ok(
+                new ApiResponse<>(true, "Profile deleted successfully", null));
+        } catch (Exception e) {
+            return ResponseEntity.ok(
+                new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
 }

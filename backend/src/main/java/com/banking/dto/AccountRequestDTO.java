@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 public class AccountRequestDTO {
     private String id;
     private String userId;
+    private String userName;
+    private String userPhone;
     private String accountType;
     private String status;
     private String createdBy;
