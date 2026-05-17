@@ -12,6 +12,7 @@ public class RegistrationPhase1Request {
     private String fathersName;
     private String gender;  // Male, Female, Other
     private LocalDate dateOfBirth;
+    private String phone;  // Phone number
 
     // Address
     private String address;
