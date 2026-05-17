@@ -1,6 +1,7 @@
 package com.banking.service;
 
 import com.banking.model.User;
+import com.banking.model.Account;
 import com.banking.repository.UserRepository;
 import com.banking.repository.AccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,13 +26,35 @@ public class UserService {
 
     public List<User> getAllUsers() {
         List<User> users = userRepository.findAll();
-        users.forEach(u -> u.setPassword(null));
+        users.forEach(u -> {
+            // Ensure name field is populated from firstName/lastName if empty
+            if ((u.getName() == null || u.getName().isEmpty()) &&
+                u.getFirstName() != null && !u.getFirstName().isEmpty()) {
+                String fullName = u.getFirstName();
+                if (u.getLastName() != null && !u.getLastName().isEmpty()) {
+                    fullName += " " + u.getLastName();
+                }
+                u.setName(fullName);
+            }
+            u.setPassword(null);
+        });
         return users;
     }
 
     public User getUserById(String id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Ensure name field is populated from firstName/lastName if empty
+        if ((user.getName() == null || user.getName().isEmpty()) &&
+            user.getFirstName() != null && !user.getFirstName().isEmpty()) {
+            String fullName = user.getFirstName();
+            if (user.getLastName() != null && !user.getLastName().isEmpty()) {
+                fullName += " " + user.getLastName();
+            }
+            user.setName(fullName);
+        }
+
         user.setPassword(null);
         return user;
     }
@@ -58,8 +81,18 @@ public class UserService {
                     .orElse(List.of());
         }
 
-        // Never return passwords
-        users.forEach(u -> u.setPassword(null));
+        // Never return passwords and ensure name field is populated
+        users.forEach(u -> {
+            if ((u.getName() == null || u.getName().isEmpty()) &&
+                u.getFirstName() != null && !u.getFirstName().isEmpty()) {
+                String fullName = u.getFirstName();
+                if (u.getLastName() != null && !u.getLastName().isEmpty()) {
+                    fullName += " " + u.getLastName();
+                }
+                u.setName(fullName);
+            }
+            u.setPassword(null);
+        });
         return users;
     }
 
@@ -73,13 +106,24 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (updatedUser.getName() != null)
+        if (updatedUser.getName() != null && !updatedUser.getName().isEmpty()) {
             user.setName(updatedUser.getName());
-        if (updatedUser.getPhone() != null)
-            user.setPhone(updatedUser.getPhone());
-        if (updatedUser.getTransactionPin() != null)
-            user.setTransactionPin(updatedUser.getTransactionPin());
+            // Split name into firstName and lastName
+            String[] nameParts = updatedUser.getName().trim().split("\\s+", 2);
+            user.setFirstName(nameParts[0]);
+            if (nameParts.length > 1) {
+                user.setLastName(nameParts[1]);
+            } else {
+                user.setLastName("");
+            }
+            user.setFullName(updatedUser.getName());
+        }
 
+        if (updatedUser.getPhone() != null && !updatedUser.getPhone().isEmpty()) {
+            user.setPhone(updatedUser.getPhone());
+        }
+
+        user.setUpdatedAt(LocalDateTime.now());
         User saved = userRepository.save(user);
 
         // Don't send sensitive data back
@@ -364,5 +408,16 @@ public class UserService {
         user.setStatus("DELETED");
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
+    }
+
+    // Update transaction PIN for a specific account
+    @Transactional
+    public void updateAccountTransactionPin(String accountId, String transactionPin) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("Account not found"));
+
+        account.setTransactionPin(transactionPin);
+        accountRepository.save(account);
+        System.out.println("✓ Transaction PIN updated for account: " + account.getAccountNumber());
     }
 }
